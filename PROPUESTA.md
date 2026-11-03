@@ -1,6 +1,6 @@
 # Surchérie · Registros — Propuesta para revisar
 
-Estado: **borrador para aprobar. No hay código todavía.**
+Estado: **aprobada e implementada.** La interfaz terminó siendo una web app propia (Next.js en Vercel) en lugar de la interfaz de Apps Script; Apps Script quedó como API de datos. Ver `README.md`. Lo descripto acá sobre pestañas, columnas, circuito y PDF se mantiene.
 
 Basado en lo que hay hoy en:
 

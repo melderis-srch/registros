@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  --color-azul: #2F55B0;
+  --color-azul-osc: #24448F;
+  --color-azul-claro: #EEF2FA;
+  --color-azul-50: #F5F7FC;
+  --color-naranja: #D65E29;
+  --color-tinta: #1B1F2A;
+  --color-gris: #5B6272;
+  --color-gris-claro: #9AA1AE;
+  --color-linea: #E3E7EF;
+  --color-fondo: #F4F6FA;
+  --color-ok: #1E7B4A;
+  --color-ok-claro: #E6F4EC;
+  --color-alerta: #A15C07;
+  --color-alerta-claro: #FDF1DE;
+  --color-err: #B3261E;
+  --color-err-claro: #FCE8E6;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --shadow-card: 0 1px 2px rgba(20, 30, 60, .04), 0 2px 10px rgba(20, 30, 60, .05);
+}
+
+html, body { background: var(--color-fondo); color: var(--color-tinta); }
+body { font-size: 14px; -webkit-font-smoothing: antialiased; }
+input, select, textarea, button { font: inherit; }
+.tnum { font-variant-numeric: tabular-nums; }
+::selection { background: #D6E0F5; }
+
+/* Campos de formulario */
+.campo {
+  width: 100%; border: 1px solid var(--color-linea); background: #fff; border-radius: 8px;
+  padding: 7px 10px; color: var(--color-tinta); outline: none; transition: border-color .12s, box-shadow .12s;
+}
+.campo:hover { border-color: #CBD3E3; }
+.campo:focus { border-color: var(--color-azul); box-shadow: 0 0 0 3px rgba(47, 85, 176, .12); }
+.campo:disabled { background: var(--color-azul-50); color: var(--color-gris); }
+.campo.falta { border-color: var(--color-err); box-shadow: 0 0 0 3px rgba(179, 38, 30, .08); }
+.campo-celda { border-color: transparent; background: transparent; padding: 5px 7px; border-radius: 6px; }
+.campo-celda:hover { border-color: var(--color-linea); background: #fff; }
+.campo-celda:focus { background: #fff; }
+input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+
+.scroll-fino::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll-fino::-webkit-scrollbar-thumb { background: #D3DAEA; border-radius: 8px; }
