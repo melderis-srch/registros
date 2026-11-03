@@ -6,8 +6,8 @@ Basado en lo que hay hoy en:
 
 | Planilla actual | Qué hace hoy | Qué la reemplaza |
 |---|---|---|
-| Seguimiento de cirugías (`Cirugias`, `Consumo2024`) | Agenda de cirugías; la app de Presupuestos ya carga filas ("Cargado desde Presupuestos") | Pestaña **Cirugias** |
-| Registro consumo cirugía (`Consumo`, `costos`, `gastos`, `base_consumo`, `lista`, `Medicos`, `Hoja 3`) | RCC 004-376, FORM POE 14-01 · costos de la cirugía · checklist de facturación | **Cirugias** + **Cirugia_Items** |
+| Seguimiento de cirugías (`Cirugias`, `Consumo2024`) | Agenda de cirugías; la app de Presupuestos ya carga filas ("Cargado desde Presupuestos") | **Se mantiene como está.** Es la fuente de las cirugías: la app la lee y le escribe el N° RCC y el N° de remito |
+| Registro consumo cirugía (`Consumo`, `costos`, `gastos`, `base_consumo`, `lista`, `Medicos`, `Hoja 3`) | RCC 004-376, FORM POE 14-01 · costos de la cirugía · checklist de facturación | **Consumos** + **Consumo_Items** |
 | Remito de transporte (`caratula_auto`, `caratula_manual`, `Contenido`, `datos_ciru`, `datos_instu`, hojas por sistema) | Remito 0001-0000-3611, FORM PG 19-01 · contenido de cada caja | **Remitos** + **Remito_Items** + **Sistemas** |
 | Orden de compra (`ocompra`, `OC pedido caja`, `Pedido de presupuesto`, `control_oc`, `cod_art`, `datos_proov`) | OC 0001-0000-3684 · solicitud de presupuesto 0000-0003 · control de OC | **OC** + **OC_Items** |
 | Recepción de stock (`recepcion`, `Facturas`, `pendientes`, `cod`, `Resumen Mensual`) | FORM POE 15-01 · lote y vencimiento por OC · pendientes | **Recepciones** + **Recepcion_Items** |
@@ -18,28 +18,33 @@ Basado en lo que hay hoy en:
 
 ```
 Presupuesto (app existente)
-      │  "cargar en seguimiento"
+      │  "cargar en seguimiento" (sin cambios)
       ▼
-CIRUGÍA  (Programada) ───────────────►  REMITO DE TRANSPORTE
+SEGUIMIENTO DE CIRUGÍAS (planilla actual, sin cambios)
+      │  la app lista las cirugías de ahí; elegís una
+      ├─────────────────────────────►  REMITO DE TRANSPORTE
       │                                  sistemas/cajas que viajan
+      │                                  escribe el N° de remito en el Seguimiento (col. H)
       │                                  ▼
       │                                  Control de retorno: cajas enviadas / vueltas
       ▼
-CIRUGÍA  (Realizada, la pasás vos)
-  registro de consumo con lote, serie y vto  ──►  PDF RCC (FORM POE 14-01)
+REGISTRO DE CONSUMO (cuando se hizo la cx)
+  toma el próximo N° RCC y lo escribe en el Seguimiento (col. A)  ──►  PDF (FORM POE 14-01)
       │
       │  "Generar OC de reposición"  → una OC por proveedor
       ▼
 ORDEN DE COMPRA (Emitida → Enviada)
       │
       ▼
-RECEPCIÓN  (lote + vto + inspección)  ──►  PDF FORM POE 15-01
+RECEPCIÓN  (acá se registran lote + vto + inspección)  ──►  PDF FORM POE 15-01
       │  descuenta lo pendiente de la OC
       ▼
 ORDEN DE COMPRA (Recibida parcial / Recibida)
 ```
 
-Cada documento se puede crear también suelto. Los vínculos son por número (N° cirugía en el remito, en la OC; N° OC en la recepción) y desde cualquier documento se abre el vinculado.
+Cada documento se puede crear también suelto. Los vínculos son por número (N° RCC o fila del Seguimiento en el remito y en la OC; N° OC en la recepción) y desde cualquier documento se abre el vinculado.
+
+**Cómo se usa el Seguimiento.** La app lee la pestaña `Cirugias` de "Seguimiento de cirugías" (salteando los títulos de mes y la sección "SIN FECHA") y muestra la lista con fecha, médico, paciente, institución, procedimiento y obra social. No se carga nada dos veces: al elegir una cirugía se completan esos datos. Lo único que la app escribe en el Seguimiento es el N° RCC (col. A) y el N° de remito (col. H), en la fila de esa cirugía. Si una cirugía no está en el Seguimiento, la app permite cargarla ahí mismo (agrega la fila en el mes que corresponde).
 
 ---
 
@@ -76,7 +81,8 @@ Convención: la primera fila es encabezado, fila 2 en adelante datos. Fechas gua
 | ultimaRecepcion | 0 |
 | tcUSD | 1545,25 (dólar BNA, se actualiza a mano) |
 | esterilizacionPorCaja | 25.000,00 |
-| usuarios | emails habilitados (vos y Noelia) |
+| usuarios | direcciontecnicasurcherie@gmail.com, cxsurcherie@gmail.com (los dos acceden a todo) |
+| seguimientoId | ID de "Seguimiento de cirugías" (15HI2_nU6Tc6mFxRdDuJRSCmNgTH3gKQFq1ATwhab63M) |
 | carpetaCirugias · carpetaRemitos · carpetaOC · carpetaRecepciones | IDs de carpetas de Drive (las crea `setup()`) |
 
 **Clientes** (obras sociales) — de `Datos.gs`, igual que Presupuestos
@@ -86,7 +92,9 @@ Convención: la primera fila es encabezado, fila 2 en adelante datos. Fechas gua
 `Código · Descripción · Marca · Modelo · Detalle · Origen · Proveedor habitual ▾ · Costo ref. · Moneda ▾ (ARS/USD) · Alícuota IVA ▾ · Activo`
 
 **Proveedores** — de `datos_proov` (≈37)
-`Código · Razón social · CUIT · Condición IVA ▾ · Domicilio · Localidad · Contacto · Email · Teléfono · Condiciones de pago habituales`
+`Código · Razón social · CUIT · Condición IVA ▾ · Domicilio · Localidad · Contacto · Email · Teléfono · Moneda ▾ (ARS / USD) · Condiciones de pago habituales`
+
+La moneda del proveedor es la que toma la OC por defecto (se puede cambiar en cada OC).
 
 **Medicos** — de `Medicos` (≈165)
 `Nombre (Apellido, Nombre) · CUIT · Localidad · Mat. provincial · Mat. nacional · Especialidad · Teléfono · Sellos ☐`
@@ -97,44 +105,49 @@ Convención: la primera fila es encabezado, fila 2 en adelante datos. Fechas gua
 **Sistemas** (cajas que viajan) — de `Contenido` (≈80)
 `Código · Descripción · Marca · Estéril ☐`
 
-**Sistemas_Contenido** (opcional) — de las hojas `quimera1`, `cage + trim`, `RTR`, etc.
+**Sistemas_Contenido** — de las hojas `quimera1`, `cage + trim`, `RTR`, etc.
 `Sistema · Bandeja/Sección · Cantidad · Código · Descripción`
-Sirve para imprimir el listado de una caja como anexo del remito.
+Se imprime como anexo del remito (una página por sistema). Se edita desde la app (pestaña Datos → Sistemas) o en el Sheet; y en cada remito se puede ajustar el contenido de esa caja puntual sin tocar el maestro.
 
-### 2.2 Cirugías
+### 2.2 Registro de consumo
 
-**Cirugias** (una fila por cirugía)
+La agenda **no** se duplica: sigue en "Seguimiento de cirugías". En el Sheet nuevo solo se guarda el registro de consumo de cada cirugía realizada.
+
+**Consumos** (una fila por registro de consumo; equivale a `Consumo` + `costos` + `gastos` + `base_consumo`)
 
 | Columna | Nota |
 |---|---|
-| ID | interno, se asigna al crear (C-0001…) |
-| N° RCC | `004-377`, se toma al guardar el registro de consumo |
-| Estado ▾ | Programada / Realizada / Suspendida / Dada de baja / Facturada |
-| Fecha cx · Hora | |
-| Institución · Médico · Mat. | buscador; la matrícula sale de Medicos |
-| Paciente · DNI · N° afiliado | (DNI y afiliado: pendiente que me pases el formato) |
-| Obra social | buscador de Clientes |
-| Procedimiento | texto corto, ej. "Fij 2 niv + drill + haemocer" |
+| N° RCC | `004-377`, correlativo, se toma al guardar |
+| Fecha cx | del Seguimiento |
+| Paciente | "Nombre Apellido", del Seguimiento |
+| Institución | del Seguimiento (buscador de Instituciones) |
+| Médico · Mat. | del Seguimiento; la matrícula sale de Medicos |
+| Obra social | del Seguimiento (buscador de Clientes) |
+| Procedimiento | del Seguimiento (col. F) |
 | Instrumentador · Mat. | |
+| N° remito Surchérie · N° remito transporte | |
 | N° presupuesto | texto libre |
-| Remitos · OCs | se completan solos al generarlos |
-| Cant. cajas | se completa desde el remito |
+| Cant. cajas | desde el remito; se usa para la esterilización |
 | Resumen consumo | automático, ej. `4N+1SBD` (como `base_consumo`) |
 | Costo implantes · descartables · logística · esterilización · otros · total | como la hoja `costos`; uso interno, no sale en el PDF |
 | Checklist facturación | Firma ☐ Sello ☐ Protocolo ☐ Certificado ☐ RX ☐ Epicrisis ☐ (hoy en `Hoja 3`) |
+| Estado ▾ | Registrado / Facturado |
+| OCs de reposición | se completan solas al generarlas |
 | Observaciones | |
 | PDF | link al RCC en Drive |
 | Creado · Modificado · Usuario | auditoría |
 
-**Cirugia_Items**
+**Consumo_Items**
 
-`ID cirugía · Renglón · Sección ▾ (Implantado / Descartable) · Código · Descripción · Marca/Modelo · Proveedor · Cant. · Lote · Serie · Vto · Costo unit. · Moneda · Costo ARS`
+`N° RCC · Renglón · Sección ▾ (Implantado / Descartable) · Código · Descripción · Marca/Modelo · Proveedor · Cant. · Costo unit. · Moneda · Costo ARS`
+
+Sin lote ni vencimiento: eso se registra en Recepción. El PDF conserva el recuadro **STICKERS** para pegar las etiquetas físicas, como hoy.
 
 ### 2.3 Remitos
 
 **Remitos**
 
-`N° (0001-00003612) · Fecha · Estado ▾ (Emitido / Entregado / Retornado / Anulado) · ID cirugía · Institución · GLN/CUFF · CUIT · Dirección · Localidad · Fecha cx · Médico · Paciente · Transportista · Observaciones · Recibió (aclaración) · DNI · Fecha entrega · Cajas enviadas · Cajas vueltas · PDF`
+`N° (0001-00003612) · Fecha · Estado ▾ (Emitido / Entregado / Retornado / Anulado) · N° RCC (si ya tiene) · Institución · GLN/CUFF · CUIT · Dirección · Localidad · Fecha cx · Médico · Paciente · Transportista · Observaciones · Recibió (aclaración) · DNI · Fecha entrega · Cajas enviadas · Cajas vueltas · PDF`
 
 **Remito_Items**
 
@@ -146,7 +159,7 @@ Solo cantidades, sin precios. El control de retorno registra cuántas cajas volv
 
 **OC**
 
-`N° (0001-00003685) · Tipo ▾ (Orden de compra / Solicitud de presupuesto) · Fecha · Estado ▾ (Emitida / Enviada / Recibida parcial / Recibida / Anulada) · Pedido (texto corto, ej. "repo inserto") · Proveedor · CUIT · Dirección · Localidad · Forma de envío · Fecha de envío · Condiciones de pago · Plazo y lugar de entrega · Moneda ▾ · TC · Subtotal neto · IVA 21 · IVA 10,5 · No gravado/Exento · Descuento · Total · ID cirugía · Fecha cx · Médico · Institución · Paciente · Factura proveedor · Valor factura · Observaciones · PDF`
+`N° (0001-00003685) · Tipo ▾ (Orden de compra / Solicitud de presupuesto) · Fecha · Estado ▾ (Emitida / Enviada / Recibida parcial / Recibida / Anulada) · Pedido (texto corto, ej. "repo inserto") · Proveedor · CUIT · Dirección · Localidad · Forma de envío · Fecha de envío · Condiciones de pago · Plazo y lugar de entrega · Moneda ▾ (la del proveedor) · TC (de Config, editable; solo si es USD) · Subtotal neto · IVA 21 · IVA 10,5 · No gravado/Exento · Descuento · Total · N° RCC · Fecha cx · Médico · Institución · Paciente · Factura proveedor · Valor factura · Observaciones · PDF`
 
 **OC_Items**
 
@@ -185,14 +198,14 @@ Un solo `Index.html`, con el mismo estilo que Presupuestos: barra de trabajo arr
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Cirugías** abre con una lista de las próximas (como la hoja `Cirugias` por mes) y desde ahí entrás a cada una.
+- **Cirugías** abre con la lista del Seguimiento (por mes, como la planilla), marcando cuáles ya tienen RCC y remito. Desde cada una: [Registro de consumo] [Generar remito] [Generar OC de reposición].
 - Buscadores con datalist: obra social, médico, institución, producto, proveedor, sistema. Completan y se puede pisar.
-- **Lote**: al escribir el código, el campo lote sugiere los lotes recibidos de ese código (sale de Recepcion_Items) y completa el vencimiento.
+- **Lote**: en Recepción, al escribir el código se ofrecen los lotes ya recibidos de ese código (para no tipearlos dos veces).
 - **Datos**: alta y edición rápida de médicos, instituciones, proveedores, productos y sistemas sin abrir el Sheet.
 
 Validaciones antes de guardar:
 
-- Cirugía (registro de consumo): institución, médico, paciente, fecha; cada ítem implantado con lote y vencimiento.
+- Registro de consumo: institución, médico, paciente, fecha, obra social; al menos un ítem con cantidad.
 - Remito: institución, al menos un sistema con cantidad.
 - OC: proveedor, al menos un ítem con cantidad y costo (en Solicitud de presupuesto el costo no se pide).
 - Recepción: OC o proveedor, cada ítem con lote, vencimiento e inspección.
@@ -213,17 +226,23 @@ Surchérie · San Martín 4041 …                                N° 004-377
 IVA RI · CUIT … · IIBB … · Inicio act. … · GLN …
 ════════════════════════════════════════════════════════════════════════
 ┌ PACIENTE ───────────┬ MÉDICO ───────────────┬ INSTITUCIÓN ──────────┐
-│ MORE RODRIGO        │ MORALES, ELOY         │ MIT                   │
+│ RODRIGO MORE        │ MORALES, ELOY         │ MIT                   │
 │ Obra social OSPEDYC │ M.P. 8284             │ Fecha cx 31/08/2026   │
-│ DNI · Afiliado      │ Instrumentador Noelia │ Remito N° 3582        │
+│                     │ Instrumentador Noelia │ Remito N° 3582        │
 └─────────────────────┴───────────────────────┴───────────────────────┘
 PRODUCTOS IMPLANTADOS
- Cant │ Código │ Descripción             │ Marca/Modelo  │ Lote │ Serie │ Vto
-   2  │ …      │ Tornillo pedi 6x40mm    │ Quimera/NOVAX │ …    │ …     │ …
-   6  │ …      │ Tornillo pedi 6x45mm    │ Quimera/NOVAX │ …    │ …     │ …
+ Cant │ Código │ Descripción             │ Marca/Modelo  │ Proveedor
+   2  │ …      │ Tornillo pedi 6x40mm    │ Quimera/NOVAX │ NOVAX
+   6  │ …      │ Tornillo pedi 6x45mm    │ Quimera/NOVAX │ NOVAX
+   1  │ bd_10  │ Sustituto óseo 10cc     │ Biodesis      │ Lab BIOXEN
 DESCARTABLES
-   1  │ …      │ Paño iodado             │               │ …    │       │ …
+   1  │ …      │ Paño iodado             │               │
 Procedimiento: Fij 4 niv + sustituto      Observaciones: …
+┌ STICKERS ───────────────────────────────────────────────────────────┐
+│                                                                     │
+│                 (espacio para pegar las etiquetas)                  │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 ────────────────────────────────────────────────────────────────────────
 Evaluó y confeccionó: Bioing. Melisa Deris   Aprobó: Ing. Gustavo Cobelli
                                                    Firma ____________
@@ -317,11 +336,23 @@ Un archivo `Datos.gs` con los maestros, y `cargarDatos()` los vuelca en las pest
 | Cirugía → `Medicos` | Medicos | ~165 |
 | Remito → `datos_instu` + Cirugía → `lista` (I:K) | Instituciones | ~45 |
 | Remito → `Contenido` | Sistemas | ~80 |
-| Remito → hojas por sistema | Sistemas_Contenido | opcional |
-| Seguimiento → `Cirugias` (desde 2026) | Cirugias | opcional, ver pregunta 3 |
+| Remito → hojas por sistema | Sistemas_Contenido | ~25 sistemas |
+| Seguimiento | no se importa: se lee en vivo | — |
 
 ---
 
-## 6. Preguntas abiertas
+## 6. Decisiones tomadas
 
-Ver el mensaje del chat.
+- Usuarios: direcciontecnicasurcherie@gmail.com y cxsurcherie@gmail.com, con acceso a todo.
+- Seguimiento de cirugías sigue siendo la fuente; el N° RCC se asigna correlativo al registrar cada cirugía hecha.
+- Lote y vencimiento solo en Recepción.
+- Moneda por proveedor (ARS o USD), editable por OC.
+- Solicitud de presupuesto incluida como variante de la OC, sin precios.
+- Contenido de cajas importado, editable, y como anexo del remito.
+- Reposición: una OC por proveedor.
+- Remito sin precios; el retorno cuenta cajas y no cambia el estado de la cirugía.
+
+## 7. Pendiente
+
+- `Code.gs` y `Datos.gs` de Presupuestos.
+- Aprobación de esta propuesta.
