@@ -25,10 +25,8 @@ export default function Login() {
     <main className="min-h-screen grid place-items-center px-4 bg-[radial-gradient(circle_at_20%_10%,#E4EBF9,transparent_45%),radial-gradient(circle_at_90%_90%,#F9E9E0,transparent_40%)]">
       <form onSubmit={entrar} className="w-full max-w-sm bg-white rounded-2xl shadow-card border border-linea p-8">
         <div className="mb-7">
-          <div className="text-[22px] font-extrabold tracking-tight text-azul-osc">
-            Surch<span className="text-naranja">é</span>rie
-          </div>
-          <div className="text-gris mt-1">Registros · Cirugías y compras</div>
+          <img src="/logo.jpg" alt="Surchérie · Implantes quirúrgicos" className="h-14 w-auto" />
+          <div className="text-gris mt-3">Registros · Cirugías y compras</div>
         </div>
         <label className="block text-xs font-semibold text-gris mb-1.5">Email</label>
         <input className="campo mb-4" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />

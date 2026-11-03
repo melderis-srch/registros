@@ -20,6 +20,7 @@ Navegador ──► Web app Next.js (Vercel) ──► /api/gas ──► Apps S
 | `app/` | Pantallas (Next.js App Router): `cirugias`, `compras`, `datos`, `login` y la API `/api/gas` |
 | `components/` | UI común, ficha de cirugía, marco de documentos, tabla de ítems |
 | `lib/` | Formatos argentinos, PDF (`@react-pdf/renderer`), sesión, cliente de la API, datos de demo |
+| `public/logo.jpg` | Logo de Surchérie (el mismo de Drive, "LOGO SURCHERIE.jpeg"). Los PDF usan el de Drive indicado en Config → `logoId`; si no está disponible, este |
 | `gas/` | Apps Script: `Codigo.gs` (API, numeración, Seguimiento, PDF a Drive), `Importar.gs` (datos maestros), `appsscript.json` |
 | `tests/` | Pruebas de la lógica de Apps Script con una planilla simulada (`npm test`) |
 | `PROPUESTA.md` | Esquema de pestañas y columnas aprobado |

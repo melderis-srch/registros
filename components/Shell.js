@@ -22,11 +22,7 @@ function Marco({ children }) {
     <div className="min-h-screen lg:pl-[220px]">
       <aside className="hidden lg:flex fixed inset-y-0 left-0 w-[220px] flex-col bg-white border-r border-linea">
         <div className="px-5 pt-6 pb-5">
-          {inicio?.logo ? (
-            <img src={inicio.logo} alt="Surchérie" className="h-10 w-auto object-contain" />
-          ) : (
-            <div className="text-[20px] font-extrabold tracking-tight text-azul-osc">Surch<span className="text-naranja">é</span>rie</div>
-          )}
+          <img src="/logo.jpg" alt="Surchérie · Implantes quirúrgicos" className="w-full h-auto" />
           <div className="text-[11px] font-semibold tracking-[.14em] uppercase text-gris-claro mt-2">Registros</div>
         </div>
         <nav className="px-3 flex flex-col gap-1">
@@ -46,7 +42,7 @@ function Marco({ children }) {
       </aside>
 
       <header className="lg:hidden sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-linea px-4 py-2.5 flex items-center gap-2">
-        <div className="font-extrabold text-azul-osc mr-auto">Surch<span className="text-naranja">é</span>rie</div>
+        <img src="/logo.jpg" alt="Surchérie" className="h-7 w-auto mr-auto" />
         {NAV.map((n) => (
           <Link key={n.href} href={n.href} className={cx('p-2 rounded-lg', path.startsWith(n.href) ? 'bg-azul-claro text-azul-osc' : 'text-gris')} aria-label={n.label}>
             <n.icono size={18} />
