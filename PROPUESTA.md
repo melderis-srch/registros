@@ -44,7 +44,7 @@ ORDEN DE COMPRA (Recibida parcial / Recibida)
 
 Cada documento se puede crear también suelto. Los vínculos son por número (N° RCC o fila del Seguimiento en el remito y en la OC; N° OC en la recepción) y desde cualquier documento se abre el vinculado.
 
-**Cómo se usa el Seguimiento.** La app lee la pestaña `Cirugias` de "Seguimiento de cirugías" (salteando los títulos de mes y la sección "SIN FECHA") y muestra la lista con fecha, médico, paciente, institución, procedimiento y obra social. No se carga nada dos veces: al elegir una cirugía se completan esos datos. Lo único que la app escribe en el Seguimiento es el N° RCC (col. A) y el N° de remito (col. H), en la fila de esa cirugía. Si una cirugía no está en el Seguimiento, la app permite cargarla ahí mismo (agrega la fila en el mes que corresponde).
+**Cómo se usa el Seguimiento.** La app lee la pestaña `Cirugias` de "Seguimiento de cirugías" (salteando los títulos de mes; la sección "SIN FECHA" va al panel de pendientes) y la muestra como **calendario** (ver 3.1). No se carga nada dos veces. La app escribe en el Seguimiento: altas de cirugías (en el mes que corresponde), cambios de fecha/estado/datos, el N° RCC (col. A) y el N° de remito (col. H). Agrega columnas a la derecha (Estado, Instrumentador, N° presupuesto, checklist, ID) sin tocar las existentes.
 
 ---
 
@@ -184,24 +184,98 @@ Solo cantidades, sin precios. El control de retorno registra cuántas cajas volv
 
 ---
 
-## 3. La pantalla
+## 3. La app
 
-Un solo `Index.html`, con el mismo estilo que Presupuestos: barra de trabajo arriba, hoja A4 editable abajo.
+Un solo `Index.html` con el estilo de Presupuestos y **tres pestañas**:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│ [Cirugías] [Remitos] [Órdenes de compra] [Recepciones] [Datos]       │
-├──────────────────────────────────────────────────────────────────────┤
-│ Nueva cirugía · N° se confirma al guardar   Buscar…  [Abrir ▾]       │
-│ [Nuevo] [Guardar como nuevo] [Guardar y generar PDF]                 │
-│ [Generar remito] [Generar OC de reposición]   ← solo en Cirugías     │
+│ [ Cirugías ]   [ Compras ]   [ Datos ]                               │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Cirugías** abre con la lista del Seguimiento (por mes, como la planilla), marcando cuáles ya tienen RCC y remito. Desde cada una: [Registro de consumo] [Generar remito] [Generar OC de reposición].
-- Buscadores con datalist: obra social, médico, institución, producto, proveedor, sistema. Completan y se puede pisar.
-- **Lote**: en Recepción, al escribir el código se ofrecen los lotes ya recibidos de ese código (para no tipearlos dos veces).
-- **Datos**: alta y edición rápida de médicos, instituciones, proveedores, productos y sistemas sin abrir el Sheet.
+### 3.1 Cirugías: calendario
+
+Calendario mensual con las cirugías del Seguimiento. Cada cirugía es una tarjeta en su día, con chips que muestran qué documentos ya tiene.
+
+```
+ ◄  NOVIEMBRE 2026  ►                [Mes | Semana | Lista]  [+ Cirugía]
+┌─────────┬─────────┬─────────┬─────────┬─────────┬─────────┬─────────┐
+│ Lun     │ Mar 3   │ Mié 4   │ Jue 5   │ Vie 6   │ Sáb     │ Dom     │
+│         │┌───────┐│┌───────┐│         │┌───────┐│         │         │
+│         ││Erpen  ││││Morra  ││         ││Merlini││         │         │
+│         ││Bauer C.│││Poelstr│││         ││Cuneo E││         │         │
+│         ││Fij USS ││││1 VTP  ││         ││2 cifo ││         │         │
+│         ││ ○R ○C  ││││●R ○C  ││         ││○R ○C  ││         │         │
+│         │└───────┘│└───────┘│         │└───────┘│         │         │
+│         │ +3 más  │ +1 más  │         │ +1 más  │         │         │
+└─────────┴─────────┴─────────┴─────────┴─────────┴─────────┴─────────┘
+ ● R = remito emitido   ● C = registro de consumo (RCC)   gris = suspendida
+ Panel lateral: SIN FECHA (pendientes), se arrastran a un día para programarlas
+```
+
+Al tocar una cirugía se abre su **ficha**:
+
+```
+┌ CIRUGÍA · Mié 04/11/2026 ────────────────────────────────────────────┐
+│ Paciente   Celina Poelstra          Obra social  Avalian             │
+│ Médico     Morra, Brian (M.P. …)    Institución  Sanatorio Adventista│
+│ Procedimiento  1 VTP + aguja extra                                   │
+│ Instrumentador …       N° presupuesto …       Observaciones …        │
+│ Estado  (Programada) Realizada  Suspendida  Dada de baja  Facturada  │
+│ Checklist facturación  ☐ Firma ☐ Sello ☐ Protocolo ☐ Cert. ☐ RX ☐ Epi│
+├──────────────────────────────────────────────────────────────────────┤
+│ DOCUMENTOS                                                           │
+│  Remito 0001-00003611 · 6 cajas · vueltas 5/6   [Abrir] [PDF]        │
+│  Registro de consumo — sin emitir               [Emitir registro]    │
+│  OC de reposición — ninguna                     [Generar OC]         │
+│                                                 [+ Otro remito]      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+- **[+ Cirugía]** o clic en un día vacío: alta rápida (fecha, médico, paciente, institución, obra social, procedimiento). Se guarda como fila nueva en el Seguimiento, en su mes.
+- Los cambios a la ficha (fecha, estado, datos, checklist) se escriben en el Seguimiento. Así la planilla sigue al día para quien la mire.
+- **Emitir remito** y **Emitir registro** abren el documento A4 editable, ya completo con los datos de la cirugía. Al guardar, el número queda en la ficha y en el Seguimiento.
+- **Generar OC** arma una OC por proveedor con lo consumido y salta a la pestaña Compras.
+- Filtros arriba: médico, institución, "sin remito", "sin registro", "sin facturar".
+
+**Columnas que se agregan al Seguimiento**, a la derecha de las actuales sin tocar las que hay: `Estado · Instrumentador · N° presupuesto · Checklist (6) · ID`. El `ID` es interno y sirve para encontrar la fila aunque cambie la fecha o el orden. Las columnas `Dada de baja / Suspendida / Otro` se mantienen y se sincronizan con Estado.
+
+### 3.2 Compras: OC con sus recepciones
+
+Lista de OC; cada una se despliega y muestra sus recepciones debajo. Una OC tiene una o más recepciones.
+
+```
+ Buscar…   Proveedor ▾   Estado ▾   [+ OC]  [+ Solicitud de presupuesto]
+┌──────────────────────────────────────────────────────────────────────┐
+│ ▼ OC 3684 · 03/11/2026 · CROSMED · repo inserto · USD 302,50         │
+│   Estado: Recibida parcial   Recibido 1/2 ítems   [Abrir] [PDF]      │
+│   ┌──────────────────────────────────────────────────────────────┐   │
+│   │ Ítem                         Pedido  Recibido  Pendiente     │   │
+│   │ KIMP 410 L Inserto 4x10 IZQ     1        1         0         │   │
+│   │ KIMP 412 L Inserto 4x12 IZQ     1        0         1         │   │
+│   ├──────────────────────────────────────────────────────────────┤   │
+│   │ Recepción 0012 · 05/11 · Rto 0001-… · Fact 00003-… [Abrir][PDF]│ │
+│   │                                       [+ Nueva recepción]    │   │
+│   └──────────────────────────────────────────────────────────────┘   │
+│ ► OC 3683 · 31/10/2026 · NOVAX · sistema schanz · ARS … · Recibida   │
+│ ► OC 3682 · 30/10/2026 · NOVAX · lamino · Enviada                    │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+- **[+ Nueva recepción]** desde una OC abre el formulario de recepción con los ítems **pendientes** ya cargados. Solo se completa lote, vencimiento, cantidad recibida e inspección.
+- Al guardar la recepción se actualiza la OC: Recibida parcial o Recibida. Esto reemplaza `control_oc`, `pendientes` y `Facturas`.
+- La factura del proveedor se carga en la recepción. En la OC se ven todas las facturas de sus recepciones.
+- Una recepción sin OC (muestra, préstamo) también se puede cargar suelta.
+
+### 3.3 Datos
+
+Alta y edición de médicos, instituciones, obras sociales, proveedores, productos, sistemas y contenido de cajas, sin abrir el Sheet.
+
+### 3.4 Común
+
+- Buscadores con datalist (obra social, médico, institución, producto, proveedor, sistema): completan los datos y se pueden pisar.
+- En Recepción, al escribir el código se ofrecen los lotes ya recibidos de ese código.
 
 Validaciones antes de guardar:
 
@@ -344,7 +418,8 @@ Un archivo `Datos.gs` con los maestros, y `cargarDatos()` los vuelca en las pest
 ## 6. Decisiones tomadas
 
 - Usuarios: direcciontecnicasurcherie@gmail.com y cxsurcherie@gmail.com, con acceso a todo.
-- Seguimiento de cirugías sigue siendo la fuente; el N° RCC se asigna correlativo al registrar cada cirugía hecha.
+- Seguimiento de cirugías sigue siendo la fuente; la app lo muestra como calendario y escribe en él (altas, cambios, N° RCC, N° remito). El N° RCC se asigna correlativo al emitir el registro.
+- Dos pestañas de trabajo: Cirugías (calendario + ficha con remito y registro) y Compras (OC con sus recepciones; una OC tiene una o más recepciones).
 - Lote y vencimiento solo en Recepción.
 - Moneda por proveedor (ARS o USD), editable por OC.
 - Solicitud de presupuesto incluida como variante de la OC, sin precios.
