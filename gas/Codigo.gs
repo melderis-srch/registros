@@ -40,11 +40,12 @@ var TABS = {
     ['cajas', 'Cant. cajas', 'n'], ['resumen', 'Resumen consumo'], ['costoImplantes', 'Costo implantes', 'm'],
     ['costoDescartables', 'Costo descartables', 'm'], ['costoLogistica', 'Logística', 'm'],
     ['costoEsterilizacion', 'Esterilización', 'm'], ['costoOtros', 'Otros', 'm'], ['costoTotal', 'Costo total', 'm'],
-    ['tc', 'TC', 'n'], ['ocs', 'OC de reposición'], ['obs', 'Observaciones'], ['pdf', 'PDF'],
+    ['tc', 'TC', 'n'], ['ocs', 'OC de reposición'], ['obs', 'Observaciones'], ['revisar', 'Revisar'], ['pdf', 'PDF'],
     ['creado', 'Creado', 'd'], ['modificado', 'Modificado', 'd'], ['usuario', 'Usuario']],
   Consumo_Items: [['numero', 'N° RCC'], ['renglon', 'Renglón', 'n'], ['seccion', 'Sección'], ['codigo', 'Código'],
     ['desc', 'Descripción'], ['marca', 'Marca/Modelo'], ['proveedor', 'Proveedor'], ['cant', 'Cant.', 'n'],
-    ['costo', 'Costo unit.', 'm'], ['moneda', 'Moneda'], ['costoArs', 'Costo ARS', 'm']],
+    ['costo', 'Costo unit.', 'm'], ['moneda', 'Moneda'], ['costoArs', 'Costo ARS', 'm'], ['lote', 'Lote'],
+    ['baja', 'Baja kardex'], ['oc', 'OC reposición']],
 
   Remitos: [['numero', 'N°'], ['fecha', 'Fecha', 'f'], ['estado', 'Estado'], ['idCirugia', 'ID cirugía'],
     ['rcc', 'N° RCC'], ['institucion', 'Institución'], ['gln', 'GLN/CUFF'], ['cuit', 'CUIT'],
@@ -78,7 +79,13 @@ var TABS = {
     ['modificado', 'Modificado', 'd'], ['usuario', 'Usuario']],
   Recepcion_Items: [['numero', 'N° recepción'], ['renglon', 'Renglón', 'n'], ['oc', 'N° OC'],
     ['renglonOc', 'Renglón OC', 'n'], ['codigo', 'Código'], ['desc', 'Producto'], ['lote', 'Lote'],
-    ['vto', 'Vto', 'f'], ['cant', 'Cant.', 'n'], ['empaque', 'Empaque'], ['rotulo', 'Rótulo'], ['obs', 'Observaciones']]
+    ['vto', 'Vto', 'f'], ['cant', 'Cant.', 'n'], ['empaque', 'Empaque'], ['rotulo', 'Rótulo'], ['obs', 'Observaciones'],
+    ['kardex', 'Kardex']],
+
+  /* Copia del stock de cada producto, leída de su planilla de kardex (ver Kardex.gs) */
+  Stock: [['codigo', 'Código'], ['desc', 'Descripción'], ['proveedor', 'Proveedor'], ['marca', 'Marca'],
+    ['sid', 'ID planilla'], ['hoja', 'Pestaña'], ['precioOC', 'Precio OC', 'm'], ['minimo', 'Mínimo', 'n'],
+    ['disp', 'Disponible', 'n'], ['lotes', 'Lotes'], ['error', 'Error'], ['leido', 'Leído', 'd']]
 };
 
 /* Pestañas de datos maestros editables desde la app */
@@ -123,9 +130,9 @@ var CONFIG_INICIAL = [
     'más arriba, las cuales no podrán ser alteradas bajo ningún concepto sin antes obtener la conformidad escrita de SURCHERIE.', ''],
   ['lugarEntrega', 'San Martín 4041 - Santa Fe', 'Lugar de entrega por defecto en la OC'],
   ['puntoVenta', '0001', 'Prefijo de remito y OC'],
-  ['ultimoRCC', '4376', 'Último registro de consumo emitido (4376 = 004-376)'],
-  ['ultimoRemito', '3611', 'Último remito de transporte emitido'],
-  ['ultimaOC', '3684', 'Última orden de compra emitida'],
+  ['ultimoRCC', '4469', 'Último registro de consumo emitido (4469 = 004-469)'],
+  ['ultimoRemito', '3614', 'Último remito de transporte emitido'],
+  ['ultimaOC', '3700', 'Última orden de compra emitida'],
   ['ultimaSolicitud', '3', 'Última solicitud de presupuesto emitida'],
   ['ultimaRecepcion', '0', 'Última recepción registrada'],
   ['tcUSD', '1545,25', 'Tipo de cambio por defecto (dólar BNA)'],
@@ -133,6 +140,8 @@ var CONFIG_INICIAL = [
   ['seguimientoId', '15HI2_nU6Tc6mFxRdDuJRSCmNgTH3gKQFq1ATwhab63M', 'Planilla "Seguimiento de cirugías"'],
   ['seguimientoHoja', 'Cirugias', 'Pestaña de cirugías dentro del Seguimiento'],
   ['logoId', '1ebSm-eoKgtI0pzK4D_JozPw6C-LmyJlU', 'ID del logo en Drive (JPG o PNG)'],
+  ['maestroId', '1MvXkmp88wPqKz-xyT9IQud1YD7R0A5B5Y5XzeqoYERM', 'Catálogo Maestro (link a la planilla de kardex de cada producto)'],
+  ['maestroHoja', 'catalogo', 'Pestaña del Catálogo Maestro'],
   ['carpetaRaiz', '', 'Carpeta de Drive de los PDF (la crea setup)'],
   ['carpetaConsumo', '', ''], ['carpetaRemito', '', ''], ['carpetaOC', '', ''], ['carpetaRecepcion', '', ''],
   ['fuenteOC', '1sJu7Lvi35Pfac642cb_P_TXXeTnlMty4nQQhJiPZtcM', 'Planilla vieja de OC (para importar)'],
@@ -173,7 +182,10 @@ var ACCIONES = {
   getDocumento: getDocumento, guardarDocumento: guardarDocumento, guardarRetorno: guardarRetorno,
   cambiarEstado: cambiarEstado, subirPdf: subirPdf, getCompras: getCompras,
   generarOCsReposicion: generarOCsReposicion, getTabla: getTabla, guardarTabla: guardarTabla,
-  agregarMaestro: agregarMaestro
+  agregarMaestro: agregarMaestro,
+  // Kardex.gs: por nombre, porque ese archivo se carga después de este
+  getPendientes: 'getPendientes', getStock: 'getStock', kardexSync: 'kardexSync', darBajaConsumo: 'darBajaConsumo',
+  guardarLotes: 'guardarLotes', getReposicion: 'getReposicion', pasarAOC: 'pasarAOC'
 };
 
 function doPost(e) {
@@ -184,7 +196,8 @@ function doPost(e) {
     if (!token || req.token !== token) throw new Error('No autorizado');
     USUARIO = String(req.usuario || '');
     var fn = ACCIONES[req.accion];
-    if (!fn) throw new Error('Acción desconocida: ' + req.accion);
+    if (typeof fn === 'string') fn = globalThis[fn];
+    if (typeof fn !== 'function') throw new Error('Acción desconocida: ' + req.accion);
     out = { ok: true, data: fn.apply(null, req.args || []) };
   } catch (err) {
     out = { ok: false, error: String(err && err.message ? err.message : err) };
@@ -212,6 +225,9 @@ function onOpen() {
     .addItem('1. Preparar pestañas (setup)', 'setup')
     .addItem('2. Importar datos maestros de las planillas viejas', 'importarMaestros')
     .addItem('3. Ver token para Vercel', 'generarToken')
+    .addSeparator()
+    .addItem('Leer kardex ahora', 'kardexSyncTodo')
+    .addItem('Leer kardex todas las noches', 'activarLecturaDiaria')
     .addToUi();
 }
 
@@ -273,7 +289,7 @@ function setup() {
 
   // Orden de pestañas: maestros al final
   ['Consumos', 'Consumo_Items', 'Remitos', 'Remito_Items', 'OC', 'OC_Items', 'Recepciones', 'Recepcion_Items',
-    'Vencimientos', 'Config'].forEach(function (n, i) {
+    'Stock', 'Vencimientos', 'Config'].forEach(function (n, i) {
       var s = ss.getSheetByName(n); if (s) { ss.setActiveSheet(s); ss.moveActiveSheet(i + 1); }
     });
   var hoja1 = ss.getSheetByName('Hoja 1') || ss.getSheetByName('Sheet1') || ss.getSheetByName('Hoja1');
@@ -874,6 +890,7 @@ function guardarDocumento(tipo, d) {
     if (!previo) cab.creado = ahora;
     calcularServidor_(tipo, cab, d.items);
 
+    var itemsPrevios = previo ? leer_(D.items).filter(function (r) { return String(r.numero) === String(numero); }) : [];
     if (previo) {
       cab.pdf = previo.pdf; // se reemplaza al subir el PDF nuevo
       reemplazarFila_(D.tab, previo._fila, cab);
@@ -886,6 +903,7 @@ function guardarDocumento(tipo, d) {
       o.numero = numero; o.renglon = i + 1;
       if (tipo === 'remito') o.contenido = it.contenido ? JSON.stringify(it.contenido) : '';
       if (tipo === 'recepcion') o.oc = cab.oc || '';
+      conservarDePrevios_(tipo, o, itemsPrevios);
       return o;
     });
     agregar_(D.items, items);
@@ -896,13 +914,16 @@ function guardarDocumento(tipo, d) {
       if (d.cirugia && (!d.cirugia.estado || d.cirugia.estado === 'Programada')) escribirEnSeguimiento_(d.cirugia, { estado: 'Realizada' });
     }
     if (tipo === 'remito') escribirEnSeguimiento_(d.cirugia, { remito: String(numEntero_('remito', numero)) });
+    var kardex = null;
     if (tipo === 'recepcion') {
       recalcularOC_(cab.oc);
       if (previo && previo.oc && previo.oc !== cab.oc) recalcularOC_(previo.oc);
+      SpreadsheetApp.flush();
+      kardex = ingresarRecepcionKardex_(numero);
     }
     if (tipo === 'oc') recalcularOC_(numero);
     SpreadsheetApp.flush();
-    return { numero: numero, proximos: proximos_(), lotes: tipo === 'recepcion' ? lotes_() : null };
+    return { numero: numero, proximos: proximos_(), lotes: tipo === 'recepcion' ? lotes_() : null, kardex: kardex };
   } finally { lock.releaseLock(); }
 }
 
@@ -1106,7 +1127,7 @@ function generarOCsReposicion(rcc) {
   var email = verificar_();
   var cons = leer_('Consumos').filter(function (r) { return String(r.numero) === String(rcc); })[0];
   if (!cons) throw new Error('No existe el registro ' + rcc);
-  var items = leer_('Consumo_Items').filter(function (r) { return String(r.numero) === String(rcc); });
+  var items = leer_('Consumo_Items').filter(function (r) { return String(r.numero) === String(rcc) && !r.oc; });
   var prods = {}; leer_('Productos').forEach(function (p) { prods[norm_(p.codigo)] = p; });
   var provs = leer_('Proveedores');
   var grupos = {}, sinProv = [];
@@ -1116,6 +1137,7 @@ function generarOCsReposicion(rcc) {
     if (!prov) { sinProv.push(it.desc || it.codigo); return; }
     var k = norm_(prov);
     grupos[k] = grupos[k] || { nombre: prov, items: [] };
+    grupos[k].fuentes = (grupos[k].fuentes || []).concat([it._fila]);
     grupos[k].items.push({
       codigo: it.codigo, desc: it.desc, cant: it.cant, costo: p.costo || it.costo || 0,
       alicuota: p.alicuota || '21', moneda: p.moneda || it.moneda
@@ -1147,6 +1169,7 @@ function generarOCsReposicion(rcc) {
       calcularServidor_('oc', d.cab, d.items);
       agregar_('OC', [d.cab]);
       agregar_('OC_Items', d.items.map(function (x, i) { x.numero = numero; x.renglon = i + 1; return x; }));
+      marcarOC_(g.fuentes, numero);
       creadas.push({ numero: numero, proveedor: d.cab.proveedor, items: d.items.length });
     } finally { lock.releaseLock(); }
   });

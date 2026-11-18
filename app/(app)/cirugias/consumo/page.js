@@ -1,10 +1,10 @@
 'use client';
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Calculator, ClipboardList, PackageCheck, Stethoscope } from 'lucide-react';
+import { Calculator, ClipboardList, PackageCheck, PackageMinus, Stethoscope } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useApp, useMaestros } from '@/lib/store';
-import { fmt, hoy, num } from '@/lib/format';
+import { fmt, hoy, norm, num } from '@/lib/format';
 import { EtiquetaProducto, buscarInstitucion, buscarMedico, textoProducto } from '@/lib/maestros';
 import { AreaTexto, Boton, Buscador, Campo, Cargando, Fecha, Modal, Selector, Tarjeta, Texto } from '@/components/ui';
 import Documento from '@/components/Documento';
@@ -14,7 +14,8 @@ export default function Pagina() {
   return <Suspense fallback={<Cargando />}><Consumo /></Suspense>;
 }
 
-const filaNueva = (seccion = 'Implantado') => ({ seccion, codigo: '', desc: '', marca: '', proveedor: '', cant: 1, costo: '', moneda: 'ARS' });
+const filaNueva = (seccion = 'Implantado') => ({ seccion, codigo: '', desc: '', marca: '', proveedor: '', cant: 1, costo: '', moneda: 'ARS', lote: '' });
+const nc = (s) => String(s || '').toLowerCase().replace(/[\s\-_.]/g, '');
 
 function Consumo() {
   const sp = useSearchParams();
@@ -26,6 +27,29 @@ function Consumo() {
   const cfg = inicio.config;
   const [reponer, setReponer] = useState(sp.get('reponer') === '1');
   const [generando, setGenerando] = useState(false);
+  const [stock, setStock] = useState(null);
+  const [bajando, setBajando] = useState(false);
+  useEffect(() => { api('getStock').then((d) => setStock(d.productos)).catch(() => setStock([])); }, []);
+  const stockDe = (x) => stock && (stock.find((s) => x.codigo && nc(s.codigo) === nc(x.codigo)) || stock.find((s) => x.desc && norm(s.desc) === norm(x.desc)));
+
+  async function darBaja({ numero, items, setItemsRaw }) {
+    setBajando(true);
+    try {
+      await api('guardarLotes', numero, items.map((x, i) => ({ renglon: i + 1, lote: x.lote || '', desc: x.desc })));
+      const r = await api('darBajaConsumo', numero);
+      const d = await api('getDocumento', 'consumo', numero);
+      setItemsRaw((its) => its.map((x, i) => { const s = d.items[i]; return s && norm(s.desc) === norm(x.desc) ? { ...x, lote: s.lote, baja: s.baja } : x; }));
+      api('getStock').then((s) => setStock(s.productos)).catch(() => {});
+      const partes = [];
+      if (r.ok) partes.push(`${r.ok} producto${r.ok > 1 ? 's' : ''} dado${r.ok > 1 ? 's' : ''} de baja en el kardex.`);
+      if (r.errores.length) partes.push('No pude con: ' + r.errores.join(' · '));
+      if (!r.ok && !r.errores.length) partes.push('No había nada para dar de baja.');
+      avisar(partes.join(' '), r.errores.length ? 'err' : 'ok');
+    } catch (e) {
+      avisar(e.message, 'err');
+    }
+    setBajando(false);
+  }
 
   async function cargar() {
     if (numeroParam) {
@@ -80,8 +104,13 @@ function Consumo() {
       validar={validar}
       estados={['Registrado', 'Facturado']}
       volver="/cirugias"
-      acciones={({ numero, sucio }) => numero ? (
-        <Boton variante="suave" icono={PackageCheck} onClick={() => (sucio ? avisar('Guardá los cambios antes de generar la reposición.', 'err') : setReponer(true))}>OC de reposición</Boton>
+      acciones={(ctx) => ctx.numero ? (
+        <>
+          {ctx.items.some((x) => !x.baja && stockDe(x)) && (
+            <Boton variante="suave" icono={PackageMinus} cargando={bajando} onClick={() => darBaja(ctx)}>Dar de baja en kardex</Boton>
+          )}
+          <Boton variante="suave" icono={PackageCheck} onClick={() => (ctx.sucio ? avisar('Guardá los cambios antes de generar la reposición.', 'err') : setReponer(true))}>OC de reposición</Boton>
+        </>
       ) : null}
     >
       {({ cab, setCab, items, setItems, numero }) => {
@@ -134,7 +163,7 @@ function Consumo() {
               </Tarjeta>
             </div>
 
-            <Tarjeta titulo="Material consumido" icono={ClipboardList} acciones={<span className="text-[12px] text-gris">Lote y vencimiento se registran en Recepción · el PDF deja espacio para stickers</span>}>
+            <Tarjeta titulo="Material consumido" icono={ClipboardList} acciones={<span className="text-[12px] text-gris">Cargá el lote del sticker y tocá “Dar de baja en kardex” · sin lote se usa el que vence primero</span>}>
               <TablaItems
                 cols={[
                   { k: 'seccion', h: 'Sección', w: 120, tipo: 'select', opciones: ['Implantado', 'Descartable'] },
@@ -152,6 +181,21 @@ function Consumo() {
                   { k: 'costo', h: 'Costo unit.', w: 105, tipo: 'num', al: 'r' },
                   { k: 'moneda', h: 'Mon.', w: 72, tipo: 'select', opciones: ['ARS', 'USD'] },
                   { k: 'costoArs', h: 'Costo $', w: 115, tipo: 'calc', al: 'r', valor: (x) => fmt(ars(x)) },
+                  {
+                    k: 'lote', h: 'Lote (sticker)', w: 130,
+                    render: (x, i, cambiar) => {
+                      if (x.baja) return <div className="px-2 py-1.5 font-semibold">{x.lote}</div>;
+                      const s = stockDe(x);
+                      if (!s) return <div className="px-2 py-1.5 text-gris-claro text-[12px]">{stock ? 'sin kardex' : '…'}</div>;
+                      const disp = Object.entries(s.lotes || {}).filter(([, v]) => v.disp > 0);
+                      return (
+                        <Buscador celda value={x.lote} placeholder="Lote" onChange={(t) => cambiar({ lote: t })} onElegir={([l]) => cambiar({ lote: l })}
+                          opciones={disp} texto={([l]) => l} etiqueta={([l, v]) => (<span className="flex gap-3"><b>{l}</b><span className="text-gris">{v.disp} disp · vto {v.vto}</span></span>)} />
+                      );
+                    },
+                  },
+                  { k: 'baja', h: 'Kardex', w: 150, tipo: 'calc', valor: (x) => (x.baja ? <span className="text-ok text-[12px] font-semibold" title={x.baja}>✓ {x.baja.split(' · ')[0]}{/asumido/.test(x.baja) ? ' · asumido' : ''}</span> : stockDe(x) ? <span className="text-alerta text-[12px]">pendiente</span> : <span className="text-gris-claro">—</span>) },
+                  { k: 'oc', h: 'OC', w: 90, tipo: 'calc', valor: (x) => <span className="text-[12px] text-gris">{x.oc ? String(x.oc).split('-').pop().replace(/^0+/, '') : ''}</span> },
                 ]}
                 filas={items}
                 setFilas={setItems}
@@ -164,7 +208,8 @@ function Consumo() {
               <div className="grid md:grid-cols-3 gap-3.5">
                 <Campo label="Procedimiento" className="md:col-span-2"><Texto value={cab.procedimiento} onChange={set('procedimiento')} /></Campo>
                 <Campo label="Resumen de consumo" hint="Ej.: 4N+1SBD (para el seguimiento interno)"><Texto value={cab.resumen} onChange={set('resumen')} /></Campo>
-                <Campo label="Observaciones" className="md:col-span-3"><AreaTexto value={cab.obs} onChange={set('obs')} rows={2} /></Campo>
+                <Campo label="Observaciones" className="md:col-span-2"><AreaTexto value={cab.obs} onChange={set('obs')} rows={2} /></Campo>
+                <Campo label="Revisar" hint="Si algo no cierra (cantidades, si se usó…). Mientras tenga texto no se repone."><AreaTexto value={cab.revisar} onChange={set('revisar')} rows={2} className={cab.revisar ? '!border-alerta' : ''} /></Campo>
               </div>
               {cab.ocs ? <div className="mt-3 text-[13px] text-gris">OC de reposición: <b className="text-tinta">{cab.ocs}</b></div> : null}
             </Tarjeta>

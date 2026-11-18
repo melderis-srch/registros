@@ -7,6 +7,7 @@ export const maxDuration = 60;
 const PERMITIDAS = new Set([
   'getInicio', 'getCirugias', 'getCirugia', 'guardarCirugia', 'getDocumento', 'guardarDocumento', 'guardarRetorno',
   'cambiarEstado', 'subirPdf', 'getCompras', 'generarOCsReposicion', 'getTabla', 'guardarTabla', 'agregarMaestro',
+  'getPendientes', 'getStock', 'kardexSync', 'darBajaConsumo', 'guardarLotes', 'getReposicion', 'pasarAOC',
 ]);
 
 export async function POST(req) {

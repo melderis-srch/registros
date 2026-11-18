@@ -1,15 +1,24 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CalendarDays, Database, LogOut, PackageCheck, AlertTriangle } from 'lucide-react';
+import { CalendarDays, Database, LogOut, PackageCheck, AlertTriangle, BellRing, Boxes } from 'lucide-react';
 import { AppProvider, useApp } from '@/lib/store';
 import { Cargando, cx } from '@/components/ui';
 
 const NAV = [
+  { href: '/pendientes', label: 'Pendientes', icono: BellRing, contador: true },
   { href: '/cirugias', label: 'Cirugías', icono: CalendarDays },
   { href: '/compras', label: 'Compras', icono: PackageCheck },
+  { href: '/stock', label: 'Stock', icono: Boxes },
   { href: '/datos', label: 'Datos', icono: Database },
 ];
+
+function Contador({ chico }) {
+  const { pendientes } = useApp();
+  const n = (pendientes?.alertas || []).reduce((s, a) => s + (a.n || 0), 0);
+  if (!n) return null;
+  return <span className={cx('ml-auto rounded-full bg-[#E8603C] text-white text-[11px] font-bold leading-[18px] px-1.5 min-w-[18px] text-center', chico && 'absolute -top-1 -right-1 ml-0 text-[10px] leading-[15px] min-w-[15px] px-1')}>{n > 99 ? '99+' : n}</span>;
+}
 
 function Marco({ children }) {
   const path = usePathname();
@@ -31,6 +40,7 @@ function Marco({ children }) {
             return (
               <Link key={n.href} href={n.href} className={cx('flex items-center gap-2.5 rounded-lg px-3 py-2 font-semibold text-[13.5px]', act ? 'bg-azul-claro text-azul-osc' : 'text-gris hover:bg-azul-50 hover:text-tinta')}>
                 <n.icono size={17} /> {n.label}
+                {n.contador && <Contador />}
               </Link>
             );
           })}
@@ -44,8 +54,9 @@ function Marco({ children }) {
       <header className="lg:hidden sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-linea px-4 py-2.5 flex items-center gap-2">
         <img src="/logo.jpg" alt="Surchérie" className="h-7 w-auto mr-auto" />
         {NAV.map((n) => (
-          <Link key={n.href} href={n.href} className={cx('p-2 rounded-lg', path.startsWith(n.href) ? 'bg-azul-claro text-azul-osc' : 'text-gris')} aria-label={n.label}>
+          <Link key={n.href} href={n.href} className={cx('relative p-2 rounded-lg', path.startsWith(n.href) ? 'bg-azul-claro text-azul-osc' : 'text-gris')} aria-label={n.label}>
             <n.icono size={18} />
+            {n.contador && <Contador chico />}
           </Link>
         ))}
       </header>

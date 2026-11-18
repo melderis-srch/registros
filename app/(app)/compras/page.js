@@ -61,6 +61,7 @@ function Compras() {
           <p className="text-gris mt-0.5">Órdenes de compra y lo que se fue recibiendo de cada una.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Boton variante="suave" icono={ShoppingCart} onClick={() => router.push('/compras/reponer')}>Reponer pendientes</Boton>
           <Boton icono={PackagePlus} onClick={() => router.push('/compras/recepcion')}>Recepción sin OC</Boton>
           <Boton icono={ClipboardList} onClick={() => router.push('/compras/oc?tipo=solicitud')}>Solicitud de presupuesto</Boton>
           <Boton variante="prim" icono={Plus} onClick={() => router.push('/compras/oc')}>Nueva OC</Boton>
