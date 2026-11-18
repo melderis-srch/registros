@@ -231,6 +231,8 @@ function onOpen() {
     .addSeparator()
     .addItem('Leer kardex ahora', 'kardexSyncTodo')
     .addItem('Leer kardex todas las noches', 'activarLecturaDiaria')
+    .addSeparator()
+    .addItem('Traer historial (OC, recepciones, remitos)', 'importarHistorial')
     .addToUi();
 }
 
