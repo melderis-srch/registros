@@ -143,7 +143,9 @@ var CONFIG_INICIAL = [
   ['maestroId', '1MvXkmp88wPqKz-xyT9IQud1YD7R0A5B5Y5XzeqoYERM', 'Catálogo Maestro (link a la planilla de kardex de cada producto)'],
   ['maestroHoja', 'catalogo', 'Pestaña del Catálogo Maestro'],
   ['carpetaRaiz', '', 'Carpeta de Drive de los PDF (la crea setup)'],
-  ['carpetaConsumo', '', ''], ['carpetaRemito', '', ''], ['carpetaOC', '', ''], ['carpetaRecepcion', '', ''],
+  ['carpetaConsumo', '', 'Carpeta de los RCC (ID o link de Drive)'], ['carpetaRemito', '', 'Carpeta de los remitos (ID o link)'],
+  ['carpetaOC', '', 'Carpeta de las OC (ID o link)'], ['carpetaRecepcion', '', 'Carpeta de las recepciones (ID o link)'],
+  ['subcarpetaPDF', 'mes', 'Subcarpetas: vacío = no · mes = NOVIEMBRE · mesanio = NOVIEMBRE 2026 · anio_mes = 2026/NOVIEMBRE'],
   ['fuenteOC', '1sJu7Lvi35Pfac642cb_P_TXXeTnlMty4nQQhJiPZtcM', 'Planilla vieja de OC (para importar)'],
   ['fuenteCirugia', '1cQ3kTl8MlBCt8tZbZHKkt8OHHbiqXp7Wsa8Xg7WjloM', 'Planilla vieja de registro de cirugía'],
   ['fuenteRemito', '1tJ5PSNfFqeABv239uwYuduhNiUz625mQP2XIYmZezaM', 'Planilla vieja de remito de transporte'],
@@ -327,9 +329,28 @@ function listaDe_(tab, clave) {
   return null;
 }
 
+/** Acepta un ID o un link de carpeta de Drive */
+function idDrive_(v) {
+  var s = String(v || '').trim(), m = s.match(/folders\/([\w-]{10,})/) || s.match(/[?&]id=([\w-]{10,})/);
+  return m ? m[1] : s;
+}
+
+var MESES_PDF = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+
+/** Subcarpeta por mes según Config (la crea si no existe) */
+function subcarpetaPDF_(carpeta, fecha) {
+  var modo = String(cfg_('subcarpetaPDF') || '').trim();
+  var hija = function (padre, nombre) { var it = padre.getFoldersByName(nombre); return it.hasNext() ? it.next() : padre.createFolder(nombre); };
+  var mes = MESES_PDF[fecha.getMonth()], anio = String(fecha.getFullYear());
+  if (modo === 'mes') return hija(carpeta, mes);
+  if (modo === 'mesanio') return hija(carpeta, mes + ' ' + anio);
+  if (modo === 'anio_mes') return hija(hija(carpeta, anio), mes);
+  return carpeta;
+}
+
 function carpeta_(clave, nombre, padre) {
   var id = cfg_(clave);
-  if (id) { try { return DriveApp.getFolderById(id); } catch (e) { } }
+  if (id) { try { return DriveApp.getFolderById(idDrive_(id)); } catch (e) { } }
   var f = padre ? padre.createFolder(nombre) : DriveApp.createFolder(nombre);
   setCfg_(clave, f.getId());
   return f;
@@ -1042,8 +1063,10 @@ function subirPdf(tipo, numero, b64, nombre) {
   verificar_();
   var D = DOCS[tipo];
   var carpeta;
-  try { carpeta = DriveApp.getFolderById(cfg_(D.carpeta)); }
-  catch (e) { carpeta = carpeta_(D.carpeta, D.nombre, DriveApp.getFolderById(cfg_('carpetaRaiz'))); }
+  try { carpeta = DriveApp.getFolderById(idDrive_(cfg_(D.carpeta))); }
+  catch (e) { carpeta = carpeta_(D.carpeta, D.nombre, DriveApp.getFolderById(idDrive_(cfg_('carpetaRaiz')))); }
+  var cab0 = leer_(D.tab).filter(function (r) { return String(r.numero) === String(numero); })[0] || {};
+  carpeta = subcarpetaPDF_(carpeta, aFecha_(cab0.fechaCx) || aFecha_(cab0.fecha) || new Date());
   var blob = Utilities.newBlob(Utilities.base64Decode(b64), 'application/pdf', nombre);
   var file = carpeta.createFile(blob);
   var lock = LockService.getScriptLock(); lock.waitLock(30000);
