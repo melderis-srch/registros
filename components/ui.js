@@ -80,7 +80,7 @@ export const TONO_ESTADO = {
   Programada: 'azul', Realizada: 'verde', Suspendida: 'gris', 'Dada de baja': 'gris', Facturada: 'ambar',
   Registrado: 'verde', Facturado: 'ambar',
   Emitido: 'azul', Entregado: 'ambar', Retornado: 'verde', Anulado: 'rojo',
-  Emitida: 'azul', Enviada: 'ambar', 'Recibida parcial': 'ambar', Recibida: 'verde', Anulada: 'rojo',
+  Emitida: 'azul', Enviada: 'ambar', Llegó: 'rojo', 'Recibida parcial': 'ambar', Recibida: 'verde', Anulada: 'rojo',
 };
 export function Estado({ valor }) {
   if (!valor) return null;

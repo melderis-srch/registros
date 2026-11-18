@@ -17,9 +17,9 @@ import { Boton, Cargando, Estado, Selector } from '@/components/ui';
  * - acciones({...}) → botones extra en la barra
  * - volver: ruta de "volver"
  */
-export default function Documento({ tipo, titulo, cargar, validar, preparar, estados, volver, acciones, children }) {
+export default function Documento({ tipo, titulo, cargar, validar, preparar, estados, volver, acciones, children, onGuardado }) {
   const router = useRouter();
-  const { inicio, actualizar, avisar } = useApp();
+  const { inicio, actualizar, avisar, cargarPendientes } = useApp();
   const [estado, setEstado] = useState({ cargando: true });
   const [cab, setCabRaw] = useState({});
   const [items, setItemsRaw] = useState([]);
@@ -100,6 +100,12 @@ export default function Documento({ tipo, titulo, cargar, validar, preparar, est
       const up = await api('subirPdf', tipo, n, await blobABase64(blob), nombreArchivo(tipo, c2));
       setCabRaw((c) => ({ ...c, pdf: up.url }));
       avisar(`N° ${n} guardado y PDF en Drive.`, 'ok', up.url);
+      if (r.kardex && (r.kardex.ok || r.kardex.sinKardex.length || r.kardex.errores.length)) {
+        const k = r.kardex;
+        avisar([k.ok && `Kardex: ${k.ok} producto${k.ok > 1 ? 's' : ''} cargado${k.ok > 1 ? 's' : ''}.`, k.sinKardex.length && `Sin planilla de kardex: ${k.sinKardex.join(', ')}.`, k.errores.length && `No pude cargar: ${k.errores.join(' · ')}`].filter(Boolean).join(' '), k.errores.length ? 'err' : 'ok');
+      }
+      onGuardado?.(r);
+      cargarPendientes?.();
     } catch (e) {
       avisar('No se pudo terminar: ' + e.message + (n ? ` (el N° ${n} quedó guardado; tocá Guardar para reintentar el PDF)` : ''), 'err');
     }
@@ -120,7 +126,7 @@ export default function Documento({ tipo, titulo, cargar, validar, preparar, est
   if (estado.cargando) return <Cargando />;
   if (estado.error) return <div className="max-w-lg mx-auto mt-16 bg-white border border-err/30 rounded-xl p-6 text-center text-err">{estado.error}</div>;
 
-  const ctx = { cab, setCab, items, setItems, extra, setExtra, numero, cirugia, guardar, ocupado, setOcupado, avisar, sucio, setSucio };
+  const ctx = { cab, setCab, items, setItems, setItemsRaw, setCabRaw, extra, setExtra, numero, cirugia, guardar, ocupado, setOcupado, avisar, sucio, setSucio };
 
   return (
     <div className="pb-24">

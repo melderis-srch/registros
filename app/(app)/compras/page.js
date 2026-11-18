@@ -11,7 +11,7 @@ export default function Pagina() {
   return <Suspense fallback={<Cargando />}><Compras /></Suspense>;
 }
 
-const ABIERTAS = ['Emitida', 'Enviada', 'Recibida parcial'];
+const ABIERTAS = ['Emitida', 'Enviada', 'Llegó', 'Recibida parcial'];
 
 function Compras() {
   const router = useRouter();
@@ -61,6 +61,7 @@ function Compras() {
           <p className="text-gris mt-0.5">Órdenes de compra y lo que se fue recibiendo de cada una.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Boton variante="suave" icono={ShoppingCart} onClick={() => router.push('/compras/reponer')}>Reponer pendientes</Boton>
           <Boton icono={PackagePlus} onClick={() => router.push('/compras/recepcion')}>Recepción sin OC</Boton>
           <Boton icono={ClipboardList} onClick={() => router.push('/compras/oc?tipo=solicitud')}>Solicitud de presupuesto</Boton>
           <Boton variante="prim" icono={Plus} onClick={() => router.push('/compras/oc')}>Nueva OC</Boton>
@@ -86,7 +87,7 @@ function Compras() {
               <button key={v} onClick={() => setF({ ...f, tipo: v })} className={cx('px-3 py-1 rounded-md text-[12.5px] font-semibold', f.tipo === v ? 'bg-white shadow-sm text-azul-osc' : 'text-gris')}>{l}</button>
             ))}
           </div>
-          <Selector className="!w-auto !py-1.5" value={f.estado} onChange={(v) => setF({ ...f, estado: v })} opciones={[{ value: 'abiertas', label: 'Abiertas' }, { value: 'todas', label: 'Todos los estados' }, ...['Emitida', 'Enviada', 'Recibida parcial', 'Recibida', 'Anulada'].map((e) => ({ value: e, label: e }))]} />
+          <Selector className="!w-auto !py-1.5" value={f.estado} onChange={(v) => setF({ ...f, estado: v })} opciones={[{ value: 'abiertas', label: 'Abiertas' }, { value: 'todas', label: 'Todos los estados' }, ...['Emitida', 'Enviada', 'Llegó', 'Recibida parcial', 'Recibida', 'Anulada'].map((e) => ({ value: e, label: e }))]} />
           <div className="relative ml-auto">
             <Search size={15} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gris-claro" />
             <input className="campo !pl-8 !py-1.5 w-[260px]" placeholder="N°, proveedor, producto, factura…" value={f.texto} onChange={(e) => setF({ ...f, texto: e.target.value })} />
