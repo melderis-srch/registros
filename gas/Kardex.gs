@@ -84,7 +84,9 @@ function leerUnidades_(sid, hoja) {
       var cant = typeof r[2] === 'number' ? r[2] : num_(r[2]);
       if (!lote || !cant) return;
       var rcc = String(r[7] || '').trim();
-      units.push({ fila: KARDEX_FILA_INICIO + i, lote: lote, vto: textoVto_(r[4]), vtoD: parseVto_(r[4]), cant: cant, rcc: rcc, disp: !rcc && cant === 1 });
+      units.push({ fila: KARDEX_FILA_INICIO + i, lote: lote, vto: textoVto_(r[4]), vtoD: parseVto_(r[4]), cant: cant, rcc: rcc, disp: !rcc && cant === 1,
+        ingreso: r[1] instanceof Date ? r[1] : aFecha_(r[1]), remito: String(r[5] || ''), egreso: r[6] instanceof Date ? r[6] : aFecha_(r[6]),
+        mp: String(r[8] || ''), factura: String(r[9] || '') });
     });
   }
   return { sh: sh, units: units, ultima: ultimaFilaAJ_(sh) };
@@ -571,6 +573,15 @@ function getPendientes() {
   var soloOC = ocs.filter(function (o) { return serieDe_('oc', o) === 'oc'; });
   var emit = soloOC.filter(function (o) { return o.estado === 'Emitida'; });
   var esp = soloOC.filter(function (o) { return o.estado === 'Enviada' || o.estado === 'Recibida parcial'; });
+  var lle = soloOC.filter(function (o) { return o.estado === 'Llegó'; });
+  A.push({ key: 'llego', tit: 'Llegó y falta la recepción', nivel: 'rojo', n: lle.length, urg: lle.filter(function (o) { return diasDesde_(o.modificado || o.fecha) > 2; }).length,
+    sub: 'Mercadería en el depósito sin recepción cargada: no suma al stock hasta que la cargues.', head: ['OC', 'Fecha OC', 'Proveedor', 'Ítems'],
+    rows: lle.map(function (o) { return { href: '/compras/recepcion?oc=' + encodeURIComponent(o.numero), c: [o.numero, o.fecha, o.proveedor, String(ocItems.filter(function (i) { return i.numero === o.numero; }).length)] }; }) });
+  var sinIng = sinIngresar_(stock, buscar);
+  A.push({ key: 'sinIngresar', tit: 'Recibido sin ingresar al kardex', nivel: 'rojo', n: sinIng.length,
+    sub: 'Tiene recepción pero no se pudo escribir en la planilla del producto.', head: ['Recepción', 'Fecha', 'Proveedor', 'Producto', 'Lote', 'Cant.'],
+    rows: sinIng.map(function (x) { return { href: '/compras/recepcion?numero=' + encodeURIComponent(x.numero), c: [x.numero, x.fecha, x.proveedor, x.desc, x.lote, String(x.cant)] }; }),
+    accion: { label: 'Reintentar ingreso', accion: 'reingresar', refs: sinIng.map(function (x) { return x.numero; }).filter(function (v, i, a) { return a.indexOf(v) === i; }) } });
   var hrefOC = function (n) { return '/compras/oc?numero=' + encodeURIComponent(n); };
   A.push({ key: 'ocEmit', tit: 'OC armadas sin enviar', nivel: 'ambar', n: emit.length, sub: 'Cuando la mandes, pasala a “Enviada”.', head: ['OC', 'Fecha', 'Hace', 'Proveedor', 'Total'],
     rows: emit.map(function (o) { return { href: hrefOC(o.numero), c: [o.numero, o.fecha, dias_(diasDesde_(o.fecha)), o.proveedor, (o.moneda === 'USD' ? 'USD ' : '$ ') + num_(o.total).toFixed(2)] }; }) });
@@ -603,3 +614,168 @@ function getPendientes() {
 }
 
 function dias_(d) { return d === null || d === undefined ? '—' : d === 0 ? 'hoy' : d === 1 ? '1 día' : d + ' días'; }
+
+
+/* ---------------- recibido sin ingresar ---------------- */
+
+function sinIngresar_(stock, buscar) {
+  var recs = {}; leer_('Recepciones').forEach(function (r) { recs[r.numero] = r; });
+  return leer_('Recepcion_Items').filter(function (it) {
+    var r = recs[it.numero];
+    return r && r.estado !== 'Anulada' && !it.kardex && num_(it.cant) > 0 && buscar(it.codigo, it.desc);
+  }).map(function (it) {
+    var r = recs[it.numero];
+    return { numero: it.numero, fecha: r.fecha, proveedor: r.proveedor, codigo: it.codigo, desc: it.desc, lote: it.lote, cant: num_(it.cant) };
+  });
+}
+
+/** Vuelve a intentar escribir en el kardex lo recibido que quedó sin ingresar */
+function reingresarKardex(numero) {
+  verificar_();
+  var lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try { return ingresarRecepcionKardex_(numero); } finally { lock.releaseLock(); }
+}
+
+/* ---------------- movimientos de un producto ---------------- */
+
+/** Ingresos y egresos de un producto con el saldo que va quedando (lee la planilla en el momento) */
+function getMovimientos(codigo) {
+  verificar_();
+  var s = leerStock_().filter(function (x) { return ncode_(x.codigo) === ncode_(codigo); })[0];
+  if (!s) throw new Error('No encuentro ' + codigo + ' en el stock.');
+  var units = leerUnidades_(s.sid, s.hoja).units;
+  var ev = {};
+  var clave = function (tipo, f, lote, doc) { return tipo + '|' + (f ? f.getTime() : 0) + '|' + lote + '|' + doc; };
+  units.forEach(function (u) {
+    var k = clave('in', u.ingreso, u.lote, u.remito);
+    var e = ev[k] || (ev[k] = { tipo: 'Ingreso', fecha: u.ingreso, lote: u.lote, vto: u.vto, doc: u.remito ? 'Remito ' + u.remito : '', detalle: u.factura ? 'Factura ' + u.factura : '', cant: 0 });
+    e.cant += u.cant;
+    if (u.rcc) {
+      var k2 = clave('out', u.egreso, u.lote, u.rcc);
+      var o = ev[k2] || (ev[k2] = { tipo: 'Egreso', fecha: u.egreso, lote: u.lote, vto: u.vto, doc: 'RCC ' + u.rcc, detalle: u.mp, cant: 0 });
+      o.cant += u.cant;
+    }
+  });
+  var lista = Object.keys(ev).map(function (k) { return ev[k]; }).sort(function (a, b) {
+    var ta = a.fecha ? a.fecha.getTime() : 0, tb = b.fecha ? b.fecha.getTime() : 0;
+    return ta - tb || (a.tipo === 'Ingreso' ? -1 : 1);
+  });
+  var saldo = 0, porLote = {};
+  lista.forEach(function (e) {
+    var d = e.tipo === 'Ingreso' ? e.cant : -e.cant;
+    saldo += d; porLote[e.lote] = (porLote[e.lote] || 0) + d;
+    e.saldo = saldo; e.saldoLote = porLote[e.lote];
+    e.fecha = e.fecha ? fmtFecha_(e.fecha) : '';
+  });
+  return { codigo: s.codigo, desc: s.desc, hoja: s.hoja, sid: s.sid, movimientos: lista.reverse(), disp: units.filter(function (u) { return u.disp; }).length };
+}
+
+/* ---------------- tablero de gestión ---------------- */
+
+/**
+ * Totales para el tablero de Gestión. desde/hasta = 'dd/MM/yyyy' (período de consumo).
+ * Montos: costo de lista (Productos) en su moneda, y total en pesos con el TC de Config.
+ */
+function getGestion(desde, hasta) {
+  verificar_();
+  var tc = num_(cfg_('tcUSD')) || 1;
+  var dDesde = aFecha_(desde) || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  var dHasta = aFecha_(hasta) || new Date();
+  dHasta = new Date(dHasta.getFullYear(), dHasta.getMonth(), dHasta.getDate(), 23, 59);
+  var prods = {}; leer_('Productos').forEach(function (p) { prods[ncode_(p.codigo)] = p; });
+  var stock = leerStock_(), buscar = indiceStock_(stock);
+  var precio = function (codigo, desc, s) {
+    var p = prods[ncode_(codigo)] || (s && prods[ncode_(s.codigo)]) || {};
+    var c = num_(p.costo) || (s ? num_(s.precioOC) : 0);
+    var m = p.moneda || 'ARS';
+    return { costo: c, moneda: m, ars: c * (m === 'USD' ? tc : 1) };
+  };
+
+  // stock
+  var stockFilas = stock.map(function (s) {
+    var pr = precio(s.codigo, s.desc, s);
+    return { codigo: s.codigo, desc: s.desc, proveedor: s.proveedor, disp: s.disp, minimo: s.minimo, valorArs: s.disp * pr.ars, moneda: pr.moneda, costo: pr.costo,
+      lotes: Object.keys(s.lotes).length, error: s.error };
+  });
+  var stockProv = {};
+  stockFilas.forEach(function (x) {
+    var g = stockProv[x.proveedor || 'Sin proveedor'] || (stockProv[x.proveedor || 'Sin proveedor'] = { proveedor: x.proveedor || 'Sin proveedor', productos: 0, unidades: 0, valorArs: 0, bajoMin: 0 });
+    g.productos++; g.unidades += x.disp; g.valorArs += x.valorArs; if (x.minimo > 0 && x.disp < x.minimo) g.bajoMin++;
+  });
+
+  // en camino: OC enviadas o recibidas en parte
+  var ocs = leer_('OC').filter(function (o) { return serieDe_('oc', o) === 'oc'; });
+  var ocIdx = {}; ocs.forEach(function (o) { ocIdx[o.numero] = o; });
+  var enCamino = [];
+  leer_('OC_Items').forEach(function (it) {
+    var o = ocIdx[it.numero];
+    if (!o || ['Enviada', 'Recibida parcial', 'Llegó'].indexOf(o.estado) < 0) return;
+    var falta = Math.max(0, num_(it.cant) - num_(it.recibido));
+    if (!falta) return;
+    var m = o.moneda || 'ARS', v = falta * num_(it.costo) * (m === 'USD' ? (num_(o.tc) || tc) : 1);
+    enCamino.push({ oc: o.numero, fecha: o.fecha, dias: diasDesde_(o.fecha), estado: o.estado, proveedor: o.proveedor, codigo: it.codigo, desc: it.desc,
+      pedido: num_(it.cant), recibido: num_(it.recibido), falta: falta, valorArs: v });
+  });
+
+  // recibido sin ingresar
+  var sinIng = sinIngresar_(stock, buscar);
+
+  // consumo del período
+  var consumos = leer_('Consumos').filter(function (c) { var d = aFecha_(c.fechaCx) || aFecha_(c.fecha); return d && d >= dDesde && d <= dHasta; });
+  var cIdx = {}; consumos.forEach(function (c) { cIdx[c.numero] = c; });
+  var porProd = {}, porMed = {}, porInst = {}, porMes = {}, totU = 0, totArs = 0;
+  leer_('Consumo_Items').forEach(function (it) {
+    var c = cIdx[it.numero]; if (!c) return;
+    var cant = num_(it.cant); if (!cant) return;
+    var pr = precio(it.codigo, it.desc, buscar(it.codigo, it.desc));
+    var ars = num_(it.costoArs) || cant * pr.ars;
+    totU += cant; totArs += ars;
+    var kP = it.codigo || it.desc;
+    var gp = porProd[kP] || (porProd[kP] = { codigo: it.codigo, desc: it.desc, proveedor: it.proveedor, unidades: 0, ars: 0, cirugias: {} });
+    gp.unidades += cant; gp.ars += ars; gp.cirugias[c.numero] = true;
+    var med = c.medico || 'Sin médico', inst = c.institucion || 'Sin institución';
+    var gm = porMed[med] || (porMed[med] = { nombre: med, cirugias: {}, unidades: 0, ars: 0 }); gm.cirugias[c.numero] = true; gm.unidades += cant; gm.ars += ars;
+    var gi = porInst[inst] || (porInst[inst] = { nombre: inst, cirugias: {}, unidades: 0, ars: 0 }); gi.cirugias[c.numero] = true; gi.unidades += cant; gi.ars += ars;
+    var dc = aFecha_(c.fechaCx) || aFecha_(c.fecha), km = Utilities.formatDate(dc, TZ, 'yyyy-MM');
+    var gx = porMes[km] || (porMes[km] = { mes: km, cirugias: {}, unidades: 0, ars: 0 }); gx.cirugias[c.numero] = true; gx.unidades += cant; gx.ars += ars;
+  });
+  var aLista = function (o, orden) {
+    return Object.keys(o).map(function (k) { var x = o[k]; x.cirugias = Object.keys(x.cirugias).length; return x; })
+      .sort(orden || function (a, b) { return b.ars - a.ars || b.unidades - a.unidades; });
+  };
+
+  // pendiente de reponer
+  var pend = pendientesRCC_(leer_('Consumos'), leer_('Consumo_Items'), leer_('Productos'));
+  var rep = {};
+  pend.forEach(function (x) {
+    var g = rep[x.proveedor] || (rep[x.proveedor] = { proveedor: x.proveedor, items: 0, unidades: 0, ars: 0, rcc: {}, masViejo: 0 });
+    var m = x.moneda || 'ARS';
+    g.items++; g.unidades += x.cant; g.ars += x.cant * x.costo * (m === 'USD' ? tc : 1); g.rcc[x.numero] = true;
+    g.masViejo = Math.max(g.masViejo, diasDesde_(x.fechaCx) || 0);
+  });
+  var reponer = Object.keys(rep).map(function (k) { var g = rep[k]; g.rcc = Object.keys(g.rcc).length; return g; }).sort(function (a, b) { return b.ars - a.ars; });
+
+  var suma = function (l, f) { return l.reduce(function (s, x) { return s + (num_(x[f]) || 0); }, 0); };
+  return {
+    tc: tc, desde: fmtFecha_(dDesde), hasta: fmtFecha_(dHasta), kardexLeido: cfg_('kardexLeido') || '',
+    kpis: {
+      stockUnidades: suma(stockFilas, 'disp'), stockArs: suma(stockFilas, 'valorArs'), productos: stockFilas.length,
+      bajoMin: stockFilas.filter(function (x) { return x.minimo > 0 && x.disp < x.minimo; }).length,
+      sinStock: stockFilas.filter(function (x) { return x.disp === 0; }).length,
+      enCaminoUnidades: suma(enCamino, 'falta'), enCaminoArs: suma(enCamino, 'valorArs'),
+      ocAbiertas: ocs.filter(function (o) { return ['Emitida', 'Enviada', 'Llegó', 'Recibida parcial'].indexOf(o.estado) >= 0; }).length,
+      sinIngresar: sinIng.length, llego: ocs.filter(function (o) { return o.estado === 'Llegó'; }).length,
+      consumoUnidades: totU, consumoArs: totArs, cirugias: consumos.length,
+      reponerUnidades: suma(reponer, 'unidades'), reponerArs: suma(reponer, 'ars')
+    },
+    stockProv: Object.keys(stockProv).map(function (k) { return stockProv[k]; }).sort(function (a, b) { return b.valorArs - a.valorArs; }),
+    stock: stockFilas.sort(function (a, b) { return b.valorArs - a.valorArs; }),
+    enCamino: enCamino.sort(function (a, b) { return (b.dias || 0) - (a.dias || 0); }),
+    sinIngresar: sinIng,
+    consumo: {
+      productos: aLista(porProd), medicos: aLista(porMed), instituciones: aLista(porInst),
+      meses: aLista(porMes, function (a, b) { return a.mes.localeCompare(b.mes); })
+    },
+    reponer: reponer
+  };
+}

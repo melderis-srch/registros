@@ -84,7 +84,7 @@ function entorno() {
     CacheService: { getScriptCache: () => ({ get: (k) => (k === 'cfg' ? JSON.stringify(cfg) : null), put() {}, remove() {} }) },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     Utilities: {
-      formatDate: (d, _tz, f) => (f === 'yyyy-MM-dd' ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` : f.includes('HH') ? `${dmy(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}` : dmy(d)),
+      formatDate: (d, _tz, f) => (f === 'yyyy-MM' ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}` : f === 'yyyy-MM-dd' ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` : f.includes('HH') ? `${dmy(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}` : dmy(d)),
       getUuid: () => crypto.randomUUID(),
     },
     PropertiesService: { getScriptProperties: () => ({ getProperty: () => 'tok' }) },
@@ -270,4 +270,54 @@ test('pendientes: stickers, bajas listas, cirugías sin RCC o sin remito, reposi
   assert.equal(A.minimo.n, 2);
   assert.equal(A.vence.n, 1, 'el lote L-A vence el 01/01/2027');
   assert.equal(A.vence.rows[0].c[1], 'L-A');
+});
+
+test('movimientos: ingresos y egresos con saldo que se va restando', () => {
+  const { g } = entorno();
+  g.kardexSync(0, 25);
+  consumo('004-482', '10/11/2026', [{ codigo: 'SPP 59 40S', desc: 'Tornillo', cant: 2, lote: 'L-B' }]);
+  g.darBajaConsumo('004-482');
+  const m = g.getMovimientos('SPP 59-40S');
+  assert.equal(m.disp, 2);
+  const [ultimo] = m.movimientos; // el más nuevo primero
+  assert.equal(ultimo.tipo, 'Egreso');
+  assert.equal(ultimo.doc, 'RCC 004-482');
+  assert.equal(ultimo.cant, 2);
+  assert.equal(ultimo.saldo, 2);
+  assert.equal(ultimo.saldoLote, 1, 'quedó 1 del lote L-B');
+  const ingresos = m.movimientos.filter((x) => x.tipo === 'Ingreso');
+  assert.equal(ingresos.reduce((s, x) => s + x.cant, 0), 4);
+});
+
+test('gestión: stock valorizado, en camino, consumo del período y pendiente de reponer', () => {
+  const { g } = entorno();
+  g.kardexSync(0, 25);
+  consumo('004-483', '05/11/2026', [{ codigo: 'SPP 59 40S', desc: 'Tornillo pedi poli std 6x40mm', cant: 2, proveedor: 'NOVAX' }], { medico: 'Gomez, Ana', institucion: 'Sanatorio X' });
+  consumo('004-484', '05/10/2026', [{ codigo: 'bd_10', desc: 'Sustituto oseo 10cc', cant: 1, proveedor: 'LABORATORIO BIOXEN' }]);
+  const oc = g.pasarAOC('', 'NOVAX', [{ numero: '004-483', renglon: 1 }], []);
+  g.cambiarEstado('oc', oc.numero, 'Enviada');
+  const r = g.getGestion('01/11/2026', '30/11/2026');
+  assert.equal(r.kpis.stockUnidades, 5);
+  assert.equal(r.kpis.stockArs, 4 * 54.26 * 1500 + 1 * 124000);
+  assert.equal(r.kpis.enCaminoUnidades, 2);
+  assert.equal(r.enCamino[0].falta, 2);
+  assert.equal(r.kpis.cirugias, 1, 'solo noviembre');
+  assert.equal(r.kpis.consumoUnidades, 2);
+  assert.equal(r.consumo.medicos[0].nombre, 'Gomez, Ana');
+  assert.equal(r.consumo.meses[0].mes, '2026-11');
+  assert.equal(r.reponer.length, 1, 'el tornillo ya está en OC; queda el sustituto');
+  assert.equal(r.reponer[0].proveedor, 'LABORATORIO BIOXEN');
+  assert.equal(r.kpis.reponerArs, 124000);
+});
+
+test('OC que llegó sin recepción aparece en pendientes', () => {
+  const { g } = entorno();
+  g.kardexSync(0, 25);
+  consumo('004-485', '05/11/2026', [{ codigo: 'SPP 59 40S', desc: 'Tornillo', cant: 1, proveedor: 'NOVAX' }]);
+  const oc = g.pasarAOC('', 'NOVAX', [{ numero: '004-485', renglon: 1 }], []);
+  g.cambiarEstado('oc', oc.numero, 'Llegó');
+  const A = Object.fromEntries(g.getPendientes().alertas.map((a) => [a.key, a]));
+  assert.equal(A.llego.n, 1);
+  assert.match(A.llego.rows[0].href, /^\/compras\/recepcion\?oc=/);
+  assert.equal(A.ocEsp.n, 0);
 });

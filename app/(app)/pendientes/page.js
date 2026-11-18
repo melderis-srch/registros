@@ -29,6 +29,16 @@ export default function Pendientes() {
 
   async function ejecutar(acc) {
     if (acc.href) return router.push(acc.href);
+    if (acc.accion === 'reingresar') {
+      let ok = 0; const errs = [];
+      for (let i = 0; i < acc.refs.length; i++) {
+        setProgreso({ i: i + 1, n: acc.refs.length });
+        try { const r = await api('reingresarKardex', acc.refs[i]); ok += r?.ok || 0; (r?.errores || []).forEach((e) => errs.push(e)); } catch (e) { errs.push(acc.refs[i] + ' · ' + e.message); }
+      }
+      setProgreso(null);
+      avisar(errs.length ? `Ingresé ${ok}. Revisá: ${errs.slice(0, 3).join(' | ')}` : `Listo: ${ok} renglones ingresados al kardex.`, errs.length ? 'err' : 'ok');
+      return cargarPendientes();
+    }
     if (acc.accion === 'bajaTanda') {
       let ok = 0; const errs = [];
       for (let i = 0; i < acc.refs.length; i++) {
@@ -99,7 +109,7 @@ export default function Pendientes() {
               </div>
               {al.accion && (
                 <Boton variante="prim" onClick={() => ejecutar(al.accion)} cargando={!!progreso} disabled={al.accion.refs && !al.accion.refs.length}>
-                  {progreso ? `RCC ${progreso.i} de ${progreso.n}…` : al.accion.label}
+                  {progreso ? `${progreso.i} de ${progreso.n}…` : al.accion.label}
                 </Boton>
               )}
             </header>

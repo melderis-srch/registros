@@ -98,7 +98,7 @@ var LISTAS = {
   alicuota: ['21', '10,5', '0', 'Exento'],
   estadoConsumo: ['Registrado', 'Facturado'],
   estadoRemito: ['Emitido', 'Entregado', 'Retornado', 'Anulado'],
-  estadoOC: ['Emitida', 'Enviada', 'Recibida parcial', 'Recibida', 'Anulada'],
+  estadoOC: ['Emitida', 'Enviada', 'Llegó', 'Recibida parcial', 'Recibida', 'Anulada'],
   tipoOC: ['Orden de compra', 'Solicitud de presupuesto'],
   seccion: ['Implantado', 'Descartable'],
   inspeccion: ['Conforme', 'No conforme'],
@@ -185,7 +185,8 @@ var ACCIONES = {
   agregarMaestro: agregarMaestro,
   // Kardex.gs: por nombre, porque ese archivo se carga después de este
   getPendientes: 'getPendientes', getStock: 'getStock', kardexSync: 'kardexSync', darBajaConsumo: 'darBajaConsumo',
-  guardarLotes: 'guardarLotes', getReposicion: 'getReposicion', pasarAOC: 'pasarAOC'
+  guardarLotes: 'guardarLotes', getReposicion: 'getReposicion', pasarAOC: 'pasarAOC',
+  getGestion: 'getGestion', getMovimientos: 'getMovimientos', reingresarKardex: 'reingresarKardex'
 };
 
 function doPost(e) {

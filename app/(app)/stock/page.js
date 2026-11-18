@@ -130,6 +130,12 @@ function Stock() {
 
 function Detalle({ p }) {
   const hoy = new Date().toISOString().slice(0, 10);
+  const [mov, setMov] = useState(null);
+  useEffect(() => {
+    setMov(null);
+    if (p.error) return setMov({ movimientos: [] });
+    api('getMovimientos', p.codigo).then(setMov).catch((e) => setMov({ error: e.message, movimientos: [] }));
+  }, [p.codigo, p.error, p.leido]);
   const lotes = Object.entries(p.lotes || {}).sort((a, b) => (a[1].vtoIso || '9').localeCompare(b[1].vtoIso || '9'));
   return (
     <section className="bg-white rounded-xl border border-linea shadow-card p-5">
@@ -169,6 +175,30 @@ function Detalle({ p }) {
           {!lotes.length && <tr><td colSpan={4} className="px-3 py-6 text-center text-gris">Sin unidades cargadas.</td></tr>}
         </tbody>
       </table>
+      <h3 className="font-bold text-[14px] mt-6 mb-1">Movimientos</h3>
+      <p className="text-[12.5px] text-gris mb-2">Cada ingreso suma y cada cirugía resta: el saldo es lo que quedó después de ese movimiento. Lo más nuevo arriba.</p>
+      {!mov ? <div className="text-[13px] text-gris py-3">Leyendo la planilla…</div> : mov.error ? <div className="text-[13px] text-err">{mov.error}</div> : (
+        <div className="max-h-[420px] overflow-y-auto scroll-fino border border-linea rounded-lg">
+          <table className="w-full text-[13px]">
+            <thead className="bg-azul-50 text-[10.5px] uppercase tracking-wider text-azul-osc sticky top-0">
+              <tr><th className="text-left px-3 py-2">Fecha</th><th className="text-left px-3 py-2">Movimiento</th><th className="text-left px-3 py-2">Lote</th><th className="text-right px-3 py-2">Cant.</th><th className="text-right px-3 py-2">Saldo lote</th><th className="text-right px-3 py-2">Saldo total</th></tr>
+            </thead>
+            <tbody>
+              {mov.movimientos.map((m, i) => (
+                <tr key={i} className="border-t border-linea">
+                  <td className="px-3 py-1.5 whitespace-nowrap">{m.fecha || '—'}</td>
+                  <td className="px-3 py-1.5"><span className={m.tipo === 'Ingreso' ? 'text-ok font-semibold' : 'text-err font-semibold'}>{m.tipo}</span> <span className="text-gris">{m.doc}{m.detalle ? ' · ' + m.detalle : ''}</span></td>
+                  <td className="px-3 py-1.5">{m.lote}</td>
+                  <td className={cx('px-3 py-1.5 text-right tnum font-semibold', m.tipo === 'Ingreso' ? 'text-ok' : 'text-err')}>{m.tipo === 'Ingreso' ? '+' : '−'}{m.cant}</td>
+                  <td className="px-3 py-1.5 text-right tnum">{m.saldoLote}</td>
+                  <td className="px-3 py-1.5 text-right tnum font-bold">{m.saldo}</td>
+                </tr>
+              ))}
+              {!mov.movimientos.length && <tr><td colSpan={6} className="px-3 py-6 text-center text-gris">Sin movimientos.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   );
 }

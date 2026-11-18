@@ -1,12 +1,13 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CalendarDays, Database, LogOut, PackageCheck, AlertTriangle, BellRing, Boxes } from 'lucide-react';
+import { CalendarDays, Database, LogOut, PackageCheck, AlertTriangle, BellRing, Boxes, BarChart3 } from 'lucide-react';
 import { AppProvider, useApp } from '@/lib/store';
 import { Cargando, cx } from '@/components/ui';
 
 const NAV = [
   { href: '/pendientes', label: 'Pendientes', icono: BellRing, contador: true },
+  { href: '/gestion', label: 'Gestión', icono: BarChart3 },
   { href: '/cirugias', label: 'Cirugías', icono: CalendarDays },
   { href: '/compras', label: 'Compras', icono: PackageCheck },
   { href: '/stock', label: 'Stock', icono: Boxes },

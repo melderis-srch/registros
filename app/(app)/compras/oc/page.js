@@ -59,7 +59,7 @@ function OC() {
   }
 
   return (
-    <Documento tipo="oc" titulo="Orden de compra" cargar={cargar} validar={validar} preparar={preparar} estados={['Emitida', 'Enviada', 'Recibida parcial', 'Recibida', 'Anulada']} volver="/compras">
+    <Documento tipo="oc" titulo="Orden de compra" cargar={cargar} validar={validar} preparar={preparar} estados={['Emitida', 'Enviada', 'Llegó', 'Recibida parcial', 'Recibida', 'Anulada']} volver="/compras">
       {({ cab, setCab, items, setItems, numero, extra }) => {
         const set = (k) => (v) => setCab({ [k]: v });
         const sol = cab.tipo === 'Solicitud de presupuesto';
