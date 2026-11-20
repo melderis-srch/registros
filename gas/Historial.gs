@@ -29,6 +29,18 @@ function importarHistorial() {
   return msg;
 }
 
+/** Paso 2: lee todos los kardex y arma la pestaña Stock (y deja programada la lectura de cada noche). */
+function leerKardex() {
+  if (typeof kardexSyncTodo !== 'function') throw new Error('Falta el código del kardex en Código.gs: volvé a pegar "Registros (copiar todo).txt" completo.');
+  var r = kardexSyncTodo();
+  var msg = r.siguiente === null ? 'Kardex leído completo: ' + r.total + ' productos.'
+    : 'Kardex leído: ' + r.hechos + ' de ' + r.total + ' productos. Volvé a ejecutar leerKardex para seguir.';
+  if (r.siguiente === null) activarLecturaDiaria();
+  Logger.log(msg);
+  try { SpreadsheetApp.getUi().alert(msg); } catch (e) { }
+  return msg;
+}
+
 function factValida_(s) { s = String(s || '').trim(); return s && s.charAt(0) !== '#' ? s : ''; }
 
 function importarOCHist_() {
