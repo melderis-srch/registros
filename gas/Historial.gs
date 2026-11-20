@@ -9,14 +9,18 @@
 var HIST = {
   ocId: '1sJu7Lvi35Pfac642cb_P_TXXeTnlMty4nQQhJiPZtcM', ocHoja: 'control_oc',
   recId: '1LJ3ykZ1Qsgns8QWM1y5PD4c5blwhbPQ82qfuFxRzC38', facHoja: 'Facturas', pendHoja: 'pendientes',
-  diasAbierta: 60   // OC sin factura más nuevas que esto quedan "Enviada" (esperando mercadería)
+  diasAbierta: 60,  // OC sin factura más nuevas que esto quedan "Enviada" (esperando mercadería)
+  rccId: '1cQ3kTl8MlBCt8tZbZHKkt8OHHbiqXp7Wsa8Xg7WjloM',   // REGISTRO CONSUMO CIRUGIA (gastos / base_consumo)
+  rccDesde: 2026    // RCC del Seguimiento desde este año
 };
 
 function importarHistorial() {
   var r1 = importarOCHist_();
   var r2 = importarRecepcionesHist_();
   var r3 = importarRemitosHist_();
+  var r4 = importarRCCHist_();
   var msg = 'Historial importado:\n' +
+    '· RCC: ' + r4.n + ' nuevos (' + r4.costo + ' con costos, ' + r4.pdf + ' con PDF)\n' +
     '· OC: ' + r1.oc + ' nuevas (' + r1.abiertas + ' quedan esperando mercadería), ' + r1.items + ' renglones\n' +
     '· Recepciones: ' + r2 + ' nuevas\n' +
     '· Remitos: ' + r3 + ' nuevos';
@@ -122,4 +126,45 @@ function importarRemitosHist_() {
   var max = 0; leer_('Remitos').forEach(function (o) { var k = parseInt(o.numero, 10) || 0; if (k > max) max = k; });
   if (max > (parseInt(cfg_('ultimoRemito'), 10) || 0)) setCfg_('ultimoRemito', max);
   return nuevos.length;
+}
+
+/* RCC del año que ya estaban hechos: cabecera desde el Seguimiento, costos desde
+ * "REGISTRO CONSUMO CIRUGIA" › gastos, resumen desde › base_consumo y link al PDF en Drive.
+ * Los renglones (productos) no existen en ninguna planilla: quedan en el PDF. */
+function importarRCCHist_() {
+  var ya = {}; leer_('Consumos').forEach(function (o) { ya[String(o.numero)] = true; });
+  var ss = SpreadsheetApp.openById(HIST.rccId);
+  var gastos = {}, resumen = {};
+  var g = ss.getSheetByName('gastos');
+  if (g) g.getRange(5, 1, Math.max(g.getLastRow() - 4, 1), 9).getValues().forEach(function (r) {
+    var n = String(r[0]).trim(); if (n) gastos[n] = { imp: num_(r[5]), ext: num_(r[6]), desc: num_(r[7]), tot: num_(r[8]) };
+  });
+  var b = ss.getSheetByName('base_consumo');
+  if (b) b.getRange(5, 1, Math.max(b.getLastRow() - 4, 1), Math.min(b.getLastColumn(), 30)).getValues().forEach(function (r) {
+    var n = String(r[0]).trim(); if (n) resumen[n] = r.slice(5).filter(function (x) { return x !== ''; }).join(' ');
+  });
+  var mp = {}; leer_('Medicos').forEach(function (m) { mp[norm_(m.nombre)] = m.matProv; });
+  var pdfs = {};
+  var it = DriveApp.searchFiles("title contains '004-' and mimeType = 'application/pdf' and trashed = false");
+  while (it.hasNext()) { var f = it.next(), m = f.getName().match(/(\d{3}-\d{3})/); if (m && !pdfs[m[1]]) pdfs[m[1]] = f.getUrl(); }
+
+  var nuevos = [], nCosto = 0, nPdf = 0;
+  leerSeguimiento_().filas.forEach(function (c) {
+    var n = String(c.rcc || '').trim();
+    if (!/^\d{3}-\d{3}$/.test(n) || ya[n]) return;
+    var f = aFecha_(c.fecha); if (!f || f.getFullYear() < HIST.rccDesde) return;
+    ya[n] = true;
+    var gg = gastos[n] || {};
+    if (gastos[n]) nCosto++; if (pdfs[n]) nPdf++;
+    nuevos.push({ numero: n, fecha: c.fecha, estado: 'Registrado', idCirugia: c.id, fechaCx: c.fecha, paciente: c.paciente,
+      obraSocial: c.obraSocial, institucion: c.institucion, medico: c.medico, matricula: mp[norm_(c.medico)] || '',
+      instrumentador: c.instrumentador, procedimiento: c.procedimiento, remitoTr: c.remito, presupuesto: c.presupuesto,
+      resumen: resumen[n] || '', costoImplantes: gg.imp === undefined ? '' : gg.imp,
+      costoDescartables: gg.desc === undefined ? '' : gg.desc, costoOtros: gg.ext === undefined ? '' : gg.ext,
+      costoTotal: gg.tot === undefined ? '' : gg.tot, pdf: pdfs[n] || '',
+      obs: 'Importado del Seguimiento (detalle de productos en el PDF)', creado: new Date(), modificado: new Date(), usuario: 'historial' });
+  });
+  nuevos.sort(function (a, b) { return a.numero < b.numero ? -1 : 1; });
+  agregar_('Consumos', nuevos);
+  return { n: nuevos.length, costo: nCosto, pdf: nPdf };
 }
