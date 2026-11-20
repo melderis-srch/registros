@@ -15,11 +15,12 @@ var HIST = {
 };
 
 function importarHistorial() {
+  var r0 = corregirOCHist_();
   var r1 = importarOCHist_();
   var r2 = importarRecepcionesHist_();
   var r3 = importarRemitosHist_();
   var r4 = importarRCCHist_();
-  var msg = 'Historial importado:\n' +
+  var msg = 'Historial importado:\n' + (r0 ? '· OC corregidas (fecha/estado): ' + r0 + '\n' : '') +
     '· RCC: ' + r4.n + ' nuevos (' + r4.costo + ' con costos, ' + r4.pdf + ' con PDF)\n' +
     '· OC: ' + r1.oc + ' nuevas (' + r1.abiertas + ' quedan esperando mercadería), ' + r1.items + ' renglones\n' +
     '· Recepciones: ' + r2 + ' nuevas\n' +
@@ -33,9 +34,16 @@ function importarHistorial() {
 function leerKardex() {
   if (typeof kardexSyncTodo !== 'function') throw new Error('Falta el código del kardex en Código.gs: volvé a pegar "Registros (copiar todo).txt" completo.');
   var r = kardexSyncTodo();
-  var msg = r.siguiente === null ? 'Kardex leído completo: ' + r.total + ' productos.'
-    : 'Kardex leído: ' + r.hechos + ' de ' + r.total + ' productos. Volvé a ejecutar leerKardex para seguir.';
-  if (r.siguiente === null) activarLecturaDiaria();
+  var stock = leerStock_(), conError = stock.filter(function (s) { return s.error; });
+  var msg = (r.siguiente === null ? 'Kardex leído completo: ' + stock.length + ' productos en Stock.'
+    : 'Kardex leído: ' + r.hechos + ' de ' + r.total + ' productos. Volvé a ejecutar leerKardex para seguir.') +
+    (conError.length ? '\n\n' + conError.length + ' con error (columna Error de Stock), por ejemplo:\n' +
+      conError.slice(0, 5).map(function (s) { return '· ' + s.codigo + ': ' + s.error; }).join('\n') : '');
+  if (r.siguiente === null) {
+    ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'kardexSyncTodo') ScriptApp.deleteTrigger(t); });
+    ScriptApp.newTrigger('kardexSyncTodo').timeBased().everyDays(1).atHour(4).create();
+    msg += '\n\nQuedó programado para leerse solo todas las noches.';
+  }
   Logger.log(msg);
   try { SpreadsheetApp.getUi().alert(msg); } catch (e) { }
   return msg;
@@ -46,7 +54,10 @@ function factValida_(s) { s = String(s || '').trim(); return s && s.charAt(0) !=
 function importarOCHist_() {
   var ya = {}; leer_('OC').forEach(function (o) { ya[String(o.numero)] = true; });
   var src = SpreadsheetApp.openById(HIST.ocId).getSheetByName(HIST.ocHoja);
-  var vals = src.getRange(3, 1, Math.max(src.getLastRow() - 2, 1), 10).getValues();
+  var rng = src.getRange(3, 1, Math.max(src.getLastRow() - 2, 1), 10);
+  var vals = rng.getValues(), disp = rng.getDisplayValues();
+  vals.forEach(function (r, i) { r[0] = disp[i][0]; });   // fecha como se ve (la planilla vieja está en hora de Madrid)
+  var maxNum = 0; vals.forEach(function (r) { var k = parseInt(r[1], 10) || 0; if (k > maxNum && (r[2] || r[3])) maxNum = k; });
 
   // Facturas cargadas en la planilla de recepción (OC -> factura)
   var fac = {};
@@ -70,13 +81,13 @@ function importarOCHist_() {
     if (!rec) pendAbierto[oc] = true;
   });
 
-  var hoy = new Date(), nuevas = [], nuevosIt = [], abiertas = 0, ultFecha = null;
+  var hoy = new Date(), nuevas = [], nuevosIt = [], abiertas = 0;
   vals.forEach(function (r) {
     var n = String(r[1]).trim();
     if (!/^\d+$/.test(n) || ya[n]) return;
     var pedido = String(r[2] || '').trim(), prov = String(r[3] || '').trim();
     if (!pedido && !prov) return;                       // número reservado sin usar
-    var f = aFecha_(r[0]) || ultFecha; if (aFecha_(r[0])) ultFecha = aFecha_(r[0]);
+    var f = aFecha_(r[0]);
     var factura = factValida_(r[4]) || fac[n] || '';
     var enviada = r[6] === true || String(r[6]).toUpperCase() === 'TRUE';
     var recibida = r[8] === true || String(r[8]).toUpperCase() === 'TRUE';
@@ -85,7 +96,8 @@ function importarOCHist_() {
     if (pendAbierto[n]) estado = 'Enviada';
     else if (factura || recibida) estado = 'Recibida';
     else if (!enviada) estado = 'Emitida';
-    else estado = dias <= HIST.diasAbierta || !f ? 'Enviada' : 'Recibida';
+    else if (!f) estado = (+n > maxNum - 15) ? 'Enviada' : 'Recibida';
+    else estado = dias <= HIST.diasAbierta ? 'Enviada' : 'Recibida';
     if (estado === 'Enviada' || estado === 'Emitida') abiertas++;
     nuevas.push({ numero: n, tipo: 'Orden de compra', fecha: f ? fmtFecha_(f) : '', estado: estado, pedido: pedido,
       proveedor: prov, facturas: factura, moneda: 'ARS', tc: 1,
@@ -179,4 +191,28 @@ function importarRCCHist_() {
   nuevos.sort(function (a, b) { return a.numero < b.numero ? -1 : 1; });
   agregar_('Consumos', nuevos);
   return { n: nuevos.length, costo: nCosto, pdf: nPdf };
+}
+
+/* Corrige las OC importadas con la versión anterior: fecha corrida un día (zona horaria
+ * de la planilla vieja) y fecha "arrastrada" en las OC que no tenían fecha. */
+function corregirOCHist_() {
+  var src = SpreadsheetApp.openById(HIST.ocId).getSheetByName(HIST.ocHoja);
+  var disp = src.getRange(3, 1, Math.max(src.getLastRow() - 2, 1), 4).getDisplayValues();
+  var fecha = {}, maxNum = 0;
+  disp.forEach(function (r) { var n = String(r[1]).trim(); if (!/^\d+$/.test(n)) return; fecha[n] = r[0];
+    if ((r[2] || r[3]) && +n > maxNum) maxNum = +n; });
+  var sh = hoja_('OC'), h = heads_(sh), lr = sh.getLastRow();
+  if (lr < 2) return 0;
+  var cN = h.indexOf('N°'), cF = h.indexOf('Fecha'), cE = h.indexOf('Estado'), cO = h.indexOf('Observaciones'), cU = h.indexOf('Usuario');
+  var v = sh.getRange(2, 1, lr - 1, h.length).getValues(), cambios = 0;
+  v.forEach(function (r) {
+    if (String(r[cU]) !== 'historial') return;
+    var n = String(r[cN]).trim(); if (!(n in fecha)) return;
+    var f = aFecha_(fecha[n]), nueva = f || '';
+    var actual = r[cF] instanceof Date ? fmtFecha_(r[cF]) : String(r[cF] || '');
+    if ((f ? fmtFecha_(f) : '') !== actual) { r[cF] = nueva; cambios++; }
+    if (!f && /se asume/.test(String(r[cO])) && +n > maxNum - 15) { r[cE] = 'Enviada'; r[cO] = 'Importada de la planilla vieja (sin fecha)'; }
+  });
+  if (cambios) sh.getRange(2, 1, v.length, h.length).setValues(v);
+  return cambios;
 }

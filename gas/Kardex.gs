@@ -121,13 +121,24 @@ function leerStock_() {
   });
 }
 
+/** JSON de lotes que entra en una celda (máx. 50.000 caracteres): si no entra, deja solo los lotes con unidades disponibles */
+function lotesJSON_(lotes) {
+  var j = JSON.stringify(lotes);
+  if (j.length < 45000) return j;
+  var solo = {}, agotados = 0;
+  Object.keys(lotes).forEach(function (k) { if (lotes[k].disp > 0) solo[k] = lotes[k]; else agotados += lotes[k].total; });
+  solo['(agotados)'] = { vto: '', vtoIso: '', disp: 0, total: agotados };
+  j = JSON.stringify(solo);
+  return j.length < 45000 ? j : j.slice(0, 44000);
+}
+
 function escribirStock_(lista) {
   var sh = hoja_('Stock'), h = heads_(sh);
   if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, h.length).clearContent();
   if (!lista.length) return;
   var rows = lista.map(function (s) {
     var o = {}; for (var k in s) o[k] = s[k];
-    o.lotes = JSON.stringify(s.lotes || {});
+    o.lotes = lotesJSON_(s.lotes || {});
     return filaDe_(h, 'Stock', o);
   });
   if (sh.getMaxRows() < rows.length + 1) sh.insertRowsAfter(sh.getMaxRows(), rows.length + 1 - sh.getMaxRows());
