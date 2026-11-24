@@ -83,10 +83,8 @@ var TABS = {
     ['kardex', 'Kardex']],
 
   /* Copia del stock de cada producto, leída de su planilla de kardex (ver Kardex.gs) */
-  Stock: [['codigo', 'Código'], ['desc', 'Descripción'], ['proveedor', 'Proveedor'], ['marca', 'Marca'],
-    ['sid', 'ID planilla'], ['hoja', 'Pestaña'], ['precioOC', 'Precio OC', 'm'], ['minimo', 'Mínimo', 'n'],
-    ['disp', 'Disponible', 'n'], ['lotes', 'Lotes'], ['error', 'Error'], ['leido', 'Leído', 'd']]
 };
+// Stock, Stock_Lotes y Kardex_Unidades las arma KardexLectura.gs (KX_TABS).
 
 /* Pestañas de datos maestros editables desde la app */
 var MAESTROS = ['Clientes', 'Productos', 'Proveedores', 'Medicos', 'Instituciones', 'Sistemas', 'Sistemas_Contenido'];
@@ -189,7 +187,7 @@ var ACCIONES = {
   getPendientes: 'getPendientes', getStock: 'getStock', kardexSync: 'kardexSync', darBajaConsumo: 'darBajaConsumo',
   guardarLotes: 'guardarLotes', getReposicion: 'getReposicion', pasarAOC: 'pasarAOC',
   getGestion: 'getGestion', getMovimientos: 'getMovimientos', reingresarKardex: 'reingresarKardex',
-  diag: 'diag', diagKardex: 'diagKardex'
+  diag: 'diag', diagKardex: 'diagKardex', kardexEncuesta: 'kardexEncuesta'
 };
 
 function doPost(e) {
@@ -292,7 +290,7 @@ function setup() {
 
   // Orden de pestañas: maestros al final
   ['Consumos', 'Consumo_Items', 'Remitos', 'Remito_Items', 'OC', 'OC_Items', 'Recepciones', 'Recepcion_Items',
-    'Stock', 'Vencimientos', 'Config'].forEach(function (n, i) {
+    'Stock', 'Stock_Lotes', 'Kardex_Unidades', 'Vencimientos', 'Config'].forEach(function (n, i) {
       var s = ss.getSheetByName(n); if (s) { ss.setActiveSheet(s); ss.moveActiveSheet(i + 1); }
     });
   var hoja1 = ss.getSheetByName('Hoja 1') || ss.getSheetByName('Sheet1') || ss.getSheetByName('Hoja1');

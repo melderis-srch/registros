@@ -19,6 +19,7 @@ class Rango {
   insertCheckboxes() { return this; }
   setBackground() { return this; }
   setFontWeight() { return this; }
+  setFontColor() { return this; }
   setDataValidation() { return this; }
   copyTo() { return this; }
 }
@@ -28,6 +29,8 @@ class Hoja {
   celda(r, c) { return (this.filas[r - 1] || [])[c - 1] ?? ''; }
   poner(r, c, v) { while (this.filas.length < r) this.filas.push([]); this.filas[r - 1][c - 1] = v; }
   getName() { return this.nombre; }
+  clear() { this.filas = []; return this; }
+  setFrozenRows() {}
   getRange(r, c, nr, nc) {
     if (typeof r === 'string') { const m = r.match(/^([A-Z])(\d+)?:([A-Z])(\d+)?$/); const c1 = m[1].charCodeAt(0) - 64; return new Rango(this, +(m[2] || 1), c1, 1000, m[3].charCodeAt(0) - 64 - c1 + 1); }
     return new Rango(this, r, c, nr, nc);
@@ -59,7 +62,7 @@ const U = (lote, vto, rcc = '') => ['', F(1, 1), 1, lote, vto, 'R1', rcc ? F(1, 
 
 function entorno() {
   const tabs = {};
-  const ss = { getSheetByName: (n) => tabs[n] || null, setSpreadsheetTimeZone() {}, toast() {} };
+  const ss = { getSheetByName: (n) => tabs[n] || null, insertSheet: (n) => (tabs[n] = new Hoja(n)), getSheets: () => Object.values(tabs), setSpreadsheetTimeZone() {}, toast() {} };
   const k1 = kardex('6x40', [[3, '', '', '', '', '', '', '-'], U('L-A', F(1, 1, 2027)), U('L-B', F(1, 6, 2029)), U('L-B', F(1, 6, 2029)), U('L-B', F(1, 6, 2029))]);
   const k2 = kardex('10cc', [[2, '', '', '', '', '', '', '-'], U('HA1', 'dic-27'), U('HA2', 'jul-27', '004-100')]);
   const catalogo = new Hoja('catalogo', [['CATÁLOGO'], ['Código', 'Descripción', 'Proveedor', 'Marca', 'URL', 'Hoja', 'Precio OC', 'Precio CX', 'Mínimo', 'Stock', 'Activo'],
@@ -74,7 +77,7 @@ function entorno() {
   const cfg = { seguimientoId: 'X', seguimientoHoja: 'Cirugias', puntoVenta: '0001', ultimoRCC: '4472', ultimaOC: '3700', ultimaRecepcion: '0', maestroId: 'M', maestroHoja: 'catalogo', tcUSD: '1500', lugarEntrega: 'San Martín 4041' };
   const ctx = {
     SpreadsheetApp: {
-      openById: (id) => ({ getSheetByName: (n) => (externos[id] || {})[n] || null }),
+      openById: (id) => ({ getSheetByName: (n) => (externos[id] || {})[n] || null, getName: () => 'Planilla ' + id, getSpreadsheetTimeZone: () => 'America/Argentina/Buenos_Aires', getSheets: () => Object.values(externos[id] || {}) }),
       getActive: () => ss,
       getUi: () => { throw new Error('sin UI'); },
       CopyPasteType: { PASTE_FORMAT: 'f' },
@@ -89,10 +92,13 @@ function entorno() {
     },
     PropertiesService: { getScriptProperties: () => ({ getProperty: () => 'tok' }) },
     ContentService: {},
+    Logger: { log() {} },
+    ScriptApp: { getProjectTriggers: () => [], newTrigger: () => ({ timeBased: () => ({ after: () => ({ create() {} }), everyDays: () => ({ atHour: () => ({ create() {} }) }) }) }) },
   };
   Object.assign(globalThis, ctx);
   vm.runInThisContext(fs.readFileSync(new URL('../gas/Codigo.gs', import.meta.url), 'utf8'));
-  vm.runInThisContext(fs.readFileSync(new URL('../gas/Kardex.gs', import.meta.url), 'utf8'));
+  for (const f of ['Kardex.gs', 'KardexLectura.gs', 'Diag.gs']) vm.runInThisContext(fs.readFileSync(new URL('../gas/' + f, import.meta.url), 'utf8'));
+  cfg.kardexEscritura = 'SI';
   // setCfg_ escribe en Config y actualiza la copia en memoria
   globalThis.setCfg_ = (k, v) => { cfg[k] = String(v); };
   for (const [nombre, cols] of Object.entries(globalThis.TABS)) tabs[nombre] = new Hoja(nombre, [cols.map((c) => c[1])]);
@@ -127,8 +133,8 @@ test('lee el kardex del Catálogo Maestro y guarda el stock', () => {
 
 test('lee de a tandas sin perder lo anterior', () => {
   const { g } = entorno();
-  assert.equal(g.kardexSync(0, 1).siguiente, 1);
-  assert.equal(g.kardexSync(1, 1).siguiente, null);
+  assert.equal(g.kardexSync(0, 60, 1).siguiente, 1, 'una planilla por tanda con presupuesto mínimo');
+  assert.equal(g.kardexSync(1, 60, 1).siguiente, null);
   assert.equal(g.getStock().productos.length, 2);
 });
 
@@ -184,7 +190,8 @@ test('la recepción carga las unidades en el kardex una sola vez', () => {
   const r = g.guardarDocumento('recepcion', doc);
   assert.equal(r.kardex.ok, 1);
   assert.deepEqual(r.kardex.sinKardex, ['Drill']);
-  assert.deepEqual(k1.filas[10].slice(0, 8), [3, '', '', '', '', '', '', '-'], 'fila de grupo');
+  assert.equal(k1.filas[10][0], 3, 'fila de grupo con el total');
+  assert.ok(!k1.filas[10][7], 'la fila de grupo ya no lleva "-" en Nº RCC');
   assert.equal(k1.filas[11][3], 'NUEVO');
   assert.equal(k1.filas[13][9], 'A-9');
   assert.equal(k1.filas.length, 14);
@@ -320,4 +327,31 @@ test('OC que llegó sin recepción aparece en pendientes', () => {
   assert.equal(A.llego.n, 1);
   assert.match(A.llego.rows[0].href, /^\/compras\/recepcion\?oc=/);
   assert.equal(A.ocEsp.n, 0);
+});
+
+test('kardex real: series, encabezado repetido, marcas y vto sin codificar', () => {
+  const { g } = entorno();
+  const enc = ['Total Ingresado', 'Fecha Ingreso', 'Cantidad', 'Nº Lote', 'Vencimiento', 'Remito nº', 'Fecha Egreso', 'Nº RCC', 'Médico/ Paciente', 'Saldo', 'Factura'];
+  const sh = new Hoja('x', [['', '', '', 'INGRESO'], [], ['PRODUCTO'], ['2015'], enc,
+    [1, '', '', '', '', '', '', '-', '', 1],
+    ['', '21/3/2015', '1', '15810021', 'dic-22', '153262', '26/3/2015', '000-507', 'Larroca/Hernandez', 0],
+    ['010779901500654321cth3ciraps$101648128$17240331'],
+    ['2016'], enc,
+    [2],
+    ['', '14/01/2026', '', 'WW2068604', '15/10/2033', 'R', '', '', '', '', 'F-1'],
+    ['', 'tm9nb2omb6'],
+    ['', '14/01/2026', '1', 'B5745-1', 'S/C', 'R', '', '-', '', '', 'F-1'],
+    ['', '14/01/2026', '1', 'C1', '30//09/2031', 'R', '', '', '', '', 'F-1'],
+  ]);
+  const k = g.leerPestanaKardex_(sh, 'America/Los_Angeles');
+  assert.equal(k.units.length, 4, 'grupo, año, encabezado y series no son unidades');
+  assert.equal(k.units[0].serie, '010779901500654321cth3ciraps$101648128$17240331');
+  assert.equal(k.units[0].estado, 'Egresada');
+  assert.equal(k.units[1].estado, 'Disponible');
+  assert.equal(k.units[1].serie, 'tm9nb2omb6');
+  assert.ok(k.units[1].flags.includes('sin cantidad'));
+  assert.equal(k.units[2].estado, 'Marcada', '"-" en Nº RCC sin egreso queda aparte');
+  assert.ok(k.units[2].flags.some((f) => f.startsWith('vto sin codificar')));
+  assert.equal(k.units[3].vtoIso, '2031-09-30', 'barra doble');
+  assert.equal(k.cols.factura, 10, 'Factura es K, no J');
 });

@@ -1,6 +1,16 @@
 {
   "scriptId": "1IR1ZNC0JfdnSHKbHsNUrrnIgT20TS6sqleOfUcc0tiszNV4ZskvPu-EF",
   "rootDir": "gas",
-  "scriptExtensions": [".gs", ".js"],
-  "filePushOrder": ["gas/Codigo.gs", "gas/Kardex.gs", "gas/Importar.gs", "gas/Historial.gs", "gas/Diag.gs"]
+  "scriptExtensions": [
+    ".gs",
+    ".js"
+  ],
+  "filePushOrder": [
+    "gas/Codigo.gs",
+    "gas/Kardex.gs",
+    "gas/KardexLectura.gs",
+    "gas/Importar.gs",
+    "gas/Historial.gs",
+    "gas/Diag.gs"
+  ]
 }
