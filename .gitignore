@@ -3,6 +3,6 @@ node_modules/
 .env
 .env.local
 .vercel
-.clasp.json
 .clasprc.json
 .DS_Store
+gas/Local.gs

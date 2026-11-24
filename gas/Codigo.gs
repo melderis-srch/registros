@@ -188,22 +188,22 @@ var ACCIONES = {
   // Kardex.gs: por nombre, porque ese archivo se carga después de este
   getPendientes: 'getPendientes', getStock: 'getStock', kardexSync: 'kardexSync', darBajaConsumo: 'darBajaConsumo',
   guardarLotes: 'guardarLotes', getReposicion: 'getReposicion', pasarAOC: 'pasarAOC',
-  getGestion: 'getGestion', getMovimientos: 'getMovimientos', reingresarKardex: 'reingresarKardex'
+  getGestion: 'getGestion', getMovimientos: 'getMovimientos', reingresarKardex: 'reingresarKardex',
+  diag: 'diag', diagKardex: 'diagKardex'
 };
 
 function doPost(e) {
   var out;
   try {
     var req = JSON.parse(e.postData.contents);
-    var token = PropertiesService.getScriptProperties().getProperty('API_TOKEN');
-    if (!token || req.token !== token) throw new Error('No autorizado');
+    if (!tokenValido_(req.token)) throw new Error('No autorizado');
     USUARIO = String(req.usuario || '');
     var fn = ACCIONES[req.accion];
     if (typeof fn === 'string') fn = globalThis[fn];
     if (typeof fn !== 'function') throw new Error('Acción desconocida: ' + req.accion);
     out = { ok: true, data: fn.apply(null, req.args || []) };
   } catch (err) {
-    out = { ok: false, error: String(err && err.message ? err.message : err) };
+    out = { ok: false, error: String(err && err.message ? err.message : err), log: typeof LOG_ !== 'undefined' ? LOG_ : [] };
   }
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
 }
