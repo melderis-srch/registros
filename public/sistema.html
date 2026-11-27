@@ -166,7 +166,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .paper{width:794px;margin:0 auto;background:#fff;color:#111;padding:26px 27px;font:12.5px/1.25 Roboto, Arial, sans-serif;box-shadow:0 1px 3px rgba(0,0,0,.15)}
 .paper table{width:100%;border-collapse:collapse;table-layout:fixed}
 .prec td{font-size:11px}.prec .navy td{background:#283592;height:14px;border-color:#283592}.prec .sp td{border:0;height:10px}
-.prec .rr td{height:46px}.prec .w{white-space:normal}.prec .ft td{height:30px}.prec .c{text-align:center}.prec .peach td{text-align:center}
+.prec .rr td{height:46px}.prec .w{white-space:normal}.prec .ft td{height:30px}.prec .c{text-align:center}
+.paper.prec td{border-color:#8f9bb3}.prec .peach td{text-align:center;background:#dde7f3;color:#1d2c7c;overflow:visible;white-space:normal;line-height:1.2;height:24px}
 .recform{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:end;margin:0 0 12px}.recform label{display:flex;flex-direction:column;font-size:12px;color:var(--muted,#667)}.recform input{font:inherit;padding:5px 8px;border:1px solid #ccd;border-radius:6px;min-width:120px}
 
 .paper td{border:1px solid #c9c9c9;padding:2px 4px;height:21px;vertical-align:middle;overflow:hidden;white-space:nowrap}
@@ -174,7 +175,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .paper .b{font-weight:700}
 .paper .c{text-align:center}
 .paper .r{text-align:right}
-.paper .peach{background:#fbe3d2;font-weight:700}
+.paper .peach{background:#dde7f3;font-weight:700}
 .paper .hdr td{height:70px}
 .paper .hdr img{height:52px;display:block;margin:0 auto}
 .paper .tit{font-weight:700;text-align:center;font-size:13px;white-space:normal}
@@ -190,8 +191,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .paper input,.paper textarea,.paper select{width:100%;border:0;background:transparent;font:inherit;color:inherit;padding:0;margin:0;outline:none;border-bottom:1px dashed transparent}
 .paper select{appearance:none;cursor:pointer}
 .paper textarea{resize:none;height:100%;min-height:36px}
-.paper input:hover,.paper textarea:hover,.paper select:hover{border-bottom-color:#e2a07f}
-.paper input:focus,.paper textarea:focus,.paper select:focus{border-bottom-color:#e2602f;background:#fff7f2}
+.paper input:hover,.paper textarea:hover,.paper select:hover{border-bottom-color:#9fb3d6}
+.paper input:focus,.paper textarea:focus,.paper select:focus{border-bottom-color:#283592;background:#f2f6fc}
 .paper input.c{text-align:center}
 .paper input.r{text-align:right}
 .paper input.miss{color:#b42318}
@@ -2042,7 +2043,9 @@ Object.assign(acciones,{ hoyNuevaCx(){ mod="rcc"; acciones.nuevaCx(); } });
 
 
 // ---------------- ingresos atrasados: recepciones desde facturas + carga al kardex ----------------
-function recsListas(){ return ORDER.rec.map(id=>DATA.rec.get(id)).filter(x=>x&&!x.kardexOk&&!x.revisar&&(x.items||[]).length&&(x.items||[]).every(i=>i.enKardex||(i.k&&i.lote))); }
+function recsListas(){ return ORDER.rec.map(id=>DATA.rec.get(id)).filter(x=>x&&!x.kardexOk&&!x.revisar&&(x.items||[]).length&&(x.items||[]).every(i=>i.enKardex||(i.k&&i.lote)))
+  // de la más vieja a la más nueva (y por factura si es el mismo día), así el kardex queda en orden de ingreso
+  .sort((a,b)=>((parseF(a.fecha)||0)-(parseF(b.fecha)||0))||String(a.factura).localeCompare(String(b.factura))); }
 // agrega n unidades a una hoja del kardex; la factura va en la columna "Factura" de esa hoja; no duplica lote+factura ya cargados
 async function agregarKardex(sid,hoja,n,lote,vto,fecha,rem,fac){
   const dig=s=>String(s||"").replace(/\D/g,"").replace(/^0+/,""); const rango=`'${hoja.replace(/'/g,"''")}'`;
