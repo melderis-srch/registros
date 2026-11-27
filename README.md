@@ -27,49 +27,61 @@ Navegador ──► Web app Next.js (Vercel) ──► /api/gas ──► Apps S
 
 ## Puesta en marcha
 
-Son tres partes: la planilla con su Apps Script (el "motor", corre con la cuenta DT y tiene acceso a todo el kardex), el ingreso con Google y la web en Vercel. Se hace una sola vez.
+La pantalla principal es **`/sistema.html`** (Tablero de gestión, cirugías y RCC, remitos, OC, recepciones, stock y Sistema de Gestión de Calidad). Es la misma app que se armó en Claude, conectada al Apps Script: al entrar a la dirección de Vercel, después del login con Google, se abre directo.
 
-### 1. Planilla y Apps Script (cuenta direcciontecnicasurcherie@gmail.com)
+```
+Navegador ──► Vercel: /sistema.html + /api/gas (valida el login) ──► Apps Script (cuenta DT) ──► Planillas y Drive
+```
 
-1. Abrir la planilla **[Surchérie Registros](https://docs.google.com/spreadsheets/d/1cfTGC7um9e7LtaPXgravEAu4aoeUrMWF_oHFd5zGkRk/edit)** (ya está creada; tiene las pestañas *Consumos* y *Consumo_Items* listas para recibir los RCC de la app de Claude).
-2. *Extensiones → Apps Script*. Crear tres archivos de script y pegar el contenido de la carpeta `gas/`: `Codigo.gs`, `Kardex.gs` e `Importar.gs` (en ese orden). En *Configuración del proyecto* tildar "Mostrar el archivo de manifiesto en el editor" y reemplazar `appsscript.json` por el de `gas/`.
-3. Volver a la planilla y recargar. Aparece el menú **Registros**:
-   1. **Preparar pestañas (setup)**: crea el resto de las pestañas, formatos y carpetas de Drive. Pide permisos la primera vez: aceptar.
-   2. Revisar **Config**: últimos números (RCC 4469 = 004-469, remito 3614, OC 3700), tipo de cambio, firmas. Las carpetas de los PDF se pueden reemplazar por las propias pegando el link de Drive en `carpetaConsumo`, `carpetaRemito`, `carpetaOC`, `carpetaRecepcion`; `subcarpetaPDF` = `mes` las separa por mes (NOVIEMBRE).
-   3. **Importar datos maestros**: productos, proveedores, médicos, instituciones y sistemas desde las planillas viejas.
-   4. **Leer kardex ahora** y después **Leer kardex todas las noches**.
-   5. **Ver token para Vercel**: copiar el token (`GAS_TOKEN`).
-4. *Implementar → Nueva implementación → Aplicación web* · Ejecutar como: **Yo** · Acceso: **Cualquier usuario**. Copiar la URL que termina en `/exec` (`GAS_URL`).
+Todo lo que se carga queda en la pestaña **AppDB** de la planilla [Surchérie Registros](https://docs.google.com/spreadsheets/d/1cfTGC7um9e7LtaPXgravEAu4aoeUrMWF_oHFd5zGkRk/edit) (una fila por documento, con quién y cuándo lo guardó). Cada cambio en planillas o Drive queda en **AppDB_Log**. La web solo puede leer o escribir las planillas del sistema (Registros, Seguimiento de cirugías, Catálogo Maestro) y las de kardex linkeadas en el Catálogo Maestro.
 
-> Cuando cambie el código de Apps Script: *Implementar → Gestionar implementaciones → editar → Nueva versión*. La URL no cambia.
+Se hace una sola vez, con la cuenta **direcciontecnicasurcherie@gmail.com**:
 
-### 2. Ingreso con Google (una vez)
+### 1. Apps Script
 
-1. Entrar a [console.cloud.google.com](https://console.cloud.google.com) con la cuenta DT → crear un proyecto "Surcherie Registros".
-2. *APIs y servicios → Pantalla de consentimiento de OAuth*: tipo **Externo**, nombre "Surchérie Registros", mail de soporte. Publicarla (*Publicar app*).
-3. *Credenciales → Crear credenciales → ID de cliente de OAuth → Aplicación web*. En **Orígenes de JavaScript autorizados** agregar la dirección de Vercel (por ejemplo `https://registros-surcherie.vercel.app`). Copiar el **ID de cliente** (`GOOGLE_CLIENT_ID`).
+1. Abrir el [proyecto de Apps Script](https://script.google.com/d/1IR1ZNC0JfdnSHKbHsNUrrnIgT20TS6sqleOfUcc0tiszNV4ZskvPu-EF/edit).
+2. Subir el código de la carpeta `gas/`:
+   - **Con clasp** (desde la compu, en esta carpeta): `npx @google/clasp push`.
+   - **A mano**: crear el archivo `AppDB` y pegar `gas/AppDB.gs`; reemplazar `Codigo.gs` por el de `gas/` (y `Kardex`, `KardexLectura`, `Historial`, `Diag` si no están al día).
+3. *Implementar → Gestionar implementaciones*:
+   - si ya hay una aplicación web: lápiz → *Versión: Nueva versión* → *Implementar* (la URL no cambia);
+   - si no hay: *Nueva implementación → Aplicación web* · Ejecutar como **Yo** · Acceso **Cualquier usuario**.
+   Copiar la URL que termina en `/exec` → **`GAS_URL`**.
+4. En la planilla, menú **Registros → Ver token para Vercel** → **`GAS_TOKEN`**.
 
-### 3. Web en Vercel
+### 2. Ingreso con Google
 
-1. En [vercel.com](https://vercel.com), *Add New → Project* → importar este repositorio (framework: Next.js).
-2. Variables de entorno (ver `.env.example`):
+1. [Google Cloud → Credenciales](https://console.cloud.google.com/apis/credentials) → *Crear credenciales → ID de cliente de OAuth → Aplicación web* (si pide la pantalla de consentimiento: tipo **Externo**, publicarla).
+2. En **Orígenes de JavaScript autorizados** poner la dirección de Vercel (ej. `https://surcherie-registros.vercel.app`). Copiar el ID → **`GOOGLE_CLIENT_ID`**.
+
+### 3. Vercel
+
+1. [vercel.com/new](https://vercel.com/new) → importar `melderis-srch/registros` (Next.js, sin cambiar nada más).
+2. *Environment Variables*:
 
    | Variable | Valor |
    |---|---|
-   | `GAS_URL` | URL `/exec` de Apps Script |
-   | `GAS_TOKEN` | el token de *Ver token para Vercel* |
-   | `GOOGLE_CLIENT_ID` | el ID de cliente del paso 2 |
-   | `USUARIOS` | mails que pueden entrar, separados por coma |
+   | `GAS_URL` | URL `/exec` del paso 1.3 |
+   | `GAS_TOKEN` | token del paso 1.4 |
+   | `GOOGLE_CLIENT_ID` | ID del paso 2 |
+   | `USUARIOS` | mails que pueden entrar, separados por coma (ej. `direcciontecnicasurcherie@gmail.com,otra@...`) |
    | `SESSION_SECRET` | un texto largo cualquiera |
 
-3. *Deploy*. Si la dirección final es otra, agregarla en los orígenes autorizados del paso 2.3.
-4. Para sumar o sacar gente: editar `USUARIOS` en Vercel y *Redeploy*.
+3. *Deploy*. Si la dirección final no es la que pusiste en el paso 2.2, agregala ahí.
+4. Para sumar o sacar gente: editar `USUARIOS` → *Redeploy*.
 
-### 4. Traer los RCC de la app de Claude
+### 4. Pasar los datos de la app de Claude
 
-En la app de Claude (artifact *Surchérie Registros*) → *Cirugías y RCC* → **⇪ Pasar a la app del equipo**. Copia los RCC con sus productos a la planilla (solo los que falten; se puede repetir).
+En la app de Claude (*Surchérie Registros*) → **Tablero → Pasar datos a la app web**. Copia todo (cirugías y RCC, remitos, OC, recepciones, kardex leído, registros de calidad, carpetas, configuración y agenda) a la pestaña AppDB. Se puede tocar de nuevo: lo que ya está no se duplica ni se pisa. Desde ese momento se carga **solo en la web**.
 
-### 5. Probar sin tocar las planillas
+### 5. Primer uso en la web
+
+1. Entrar con Google → se abre el Tablero.
+2. *Sistema de calidad → Configuración*: agregar a la segunda persona en "Personas".
+3. *Carpetas Drive*: revisar las carpetas de los PDF (vienen de la app de Claude).
+4. *Agenda quirúrgica → Actualizar agenda* y *Stock → Actualizar desde kardex*.
+
+### 6. Probar sin tocar las planillas
 
 ```bash
 npm install

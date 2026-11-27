@@ -11,6 +11,7 @@
     "gas/KardexLectura.gs",
     "gas/Importar.gs",
     "gas/Historial.gs",
-    "gas/Diag.gs"
+    "gas/Diag.gs",
+    "gas/AppDB.gs"
   ]
 }

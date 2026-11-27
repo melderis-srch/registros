@@ -187,7 +187,10 @@ var ACCIONES = {
   getPendientes: 'getPendientes', getStock: 'getStock', kardexSync: 'kardexSync', darBajaConsumo: 'darBajaConsumo',
   guardarLotes: 'guardarLotes', getReposicion: 'getReposicion', pasarAOC: 'pasarAOC',
   getGestion: 'getGestion', getMovimientos: 'getMovimientos', reingresarKardex: 'reingresarKardex',
-  diag: 'diag', diagKardex: 'diagKardex', kardexEncuesta: 'kardexEncuesta'
+  diag: 'diag', diagKardex: 'diagKardex', kardexEncuesta: 'kardexEncuesta',
+  // AppDB.gs: sistema web (sistema.html)
+  dbTodo: 'dbTodo', dbCambios: 'dbCambios', dbSet: 'dbSet', dbDelete: 'dbDelete', dbImportar: 'dbImportar',
+  sheetsProxy: 'sheetsProxy', driveProxy: 'driveProxy'
 };
 
 function doPost(e) {
