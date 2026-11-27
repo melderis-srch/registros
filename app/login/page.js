@@ -14,7 +14,7 @@ export default function Login() {
     setError('');
     const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(datos) });
     const j = await r.json().catch(() => ({}));
-    if (j.ok) window.location.href = '/pendientes';
+    if (j.ok) window.location.href = '/sistema.html';
     else {
       setError(j.error || 'No se pudo ingresar.');
       setCargando(false);

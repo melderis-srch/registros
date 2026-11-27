@@ -83,10 +83,8 @@ var TABS = {
     ['kardex', 'Kardex']],
 
   /* Copia del stock de cada producto, leída de su planilla de kardex (ver Kardex.gs) */
-  Stock: [['codigo', 'Código'], ['desc', 'Descripción'], ['proveedor', 'Proveedor'], ['marca', 'Marca'],
-    ['sid', 'ID planilla'], ['hoja', 'Pestaña'], ['precioOC', 'Precio OC', 'm'], ['minimo', 'Mínimo', 'n'],
-    ['disp', 'Disponible', 'n'], ['lotes', 'Lotes'], ['error', 'Error'], ['leido', 'Leído', 'd']]
 };
+// Stock, Stock_Lotes y Kardex_Unidades las arma KardexLectura.gs (KX_TABS).
 
 /* Pestañas de datos maestros editables desde la app */
 var MAESTROS = ['Clientes', 'Productos', 'Proveedores', 'Medicos', 'Instituciones', 'Sistemas', 'Sistemas_Contenido'];
@@ -188,22 +186,25 @@ var ACCIONES = {
   // Kardex.gs: por nombre, porque ese archivo se carga después de este
   getPendientes: 'getPendientes', getStock: 'getStock', kardexSync: 'kardexSync', darBajaConsumo: 'darBajaConsumo',
   guardarLotes: 'guardarLotes', getReposicion: 'getReposicion', pasarAOC: 'pasarAOC',
-  getGestion: 'getGestion', getMovimientos: 'getMovimientos', reingresarKardex: 'reingresarKardex'
+  getGestion: 'getGestion', getMovimientos: 'getMovimientos', reingresarKardex: 'reingresarKardex',
+  diag: 'diag', diagKardex: 'diagKardex', kardexEncuesta: 'kardexEncuesta',
+  // AppDB.gs: sistema web (sistema.html)
+  dbTodo: 'dbTodo', dbCambios: 'dbCambios', dbSet: 'dbSet', dbDelete: 'dbDelete', dbImportar: 'dbImportar',
+  sheetsProxy: 'sheetsProxy', driveProxy: 'driveProxy'
 };
 
 function doPost(e) {
   var out;
   try {
     var req = JSON.parse(e.postData.contents);
-    var token = PropertiesService.getScriptProperties().getProperty('API_TOKEN');
-    if (!token || req.token !== token) throw new Error('No autorizado');
+    if (!tokenValido_(req.token)) throw new Error('No autorizado');
     USUARIO = String(req.usuario || '');
     var fn = ACCIONES[req.accion];
     if (typeof fn === 'string') fn = globalThis[fn];
     if (typeof fn !== 'function') throw new Error('Acción desconocida: ' + req.accion);
     out = { ok: true, data: fn.apply(null, req.args || []) };
   } catch (err) {
-    out = { ok: false, error: String(err && err.message ? err.message : err) };
+    out = { ok: false, error: String(err && err.message ? err.message : err), log: typeof LOG_ !== 'undefined' ? LOG_ : [] };
   }
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
 }
@@ -292,7 +293,7 @@ function setup() {
 
   // Orden de pestañas: maestros al final
   ['Consumos', 'Consumo_Items', 'Remitos', 'Remito_Items', 'OC', 'OC_Items', 'Recepciones', 'Recepcion_Items',
-    'Stock', 'Vencimientos', 'Config'].forEach(function (n, i) {
+    'Stock', 'Stock_Lotes', 'Kardex_Unidades', 'Vencimientos', 'Config'].forEach(function (n, i) {
       var s = ss.getSheetByName(n); if (s) { ss.setActiveSheet(s); ss.moveActiveSheet(i + 1); }
     });
   var hoja1 = ss.getSheetByName('Hoja 1') || ss.getSheetByName('Sheet1') || ss.getSheetByName('Hoja1');

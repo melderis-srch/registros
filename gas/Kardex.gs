@@ -3,16 +3,14 @@
  *
  * El kardex (FORM POE 14-02) es una planilla por producto, con una pestaña por variante, y el
  * Catálogo Maestro tiene el link y la pestaña de cada código. Cada unidad es una fila:
- *   A total ingresado (solo en la fila de grupo) · B fecha ingreso · C cantidad (1) · D lote · E vto ·
- *   F remito · G fecha egreso · H N° RCC · I médico/paciente · J factura
- * Disponible = filas con C = 1 y H vacío (la misma cuenta que la fórmula de la planilla).
+ *   Las columnas se ubican por encabezado (ver KardexLectura.gs): Total ingresado, Fecha ingreso, Cantidad,
+ *   Nº Lote, Vencimiento, Remito, Fecha egreso, Nº RCC, Médico/Paciente, Saldo, Factura.
  *
  * La pestaña "Stock" de este Sheet guarda una copia de lo leído para que la app responda rápido;
  * se actualiza con "Leer kardex" (app o menú), todas las noches si se activa, y después de cada
  * baja o ingreso del producto tocado.
  */
 
-var KARDEX_FILA_INICIO = 6; // las primeras 5 filas son título y encabezados
 
 /* ---------------- utilidades ---------------- */
 
@@ -26,10 +24,13 @@ var MESES_CORTOS = { ene: 0, feb: 1, mar: 2, abr: 3, may: 4, jun: 5, jul: 6, ago
 /** Vencimiento en cualquiera de los formatos que aparecen en el kardex → Date (o null) */
 function parseVto_(v) {
   if (v instanceof Date) return new Date(v.getFullYear(), v.getMonth(), v.getDate(), 12);
-  var s = String(v || '').trim().toLowerCase(), m;
+  var s = String(v || '').trim().toLowerCase().replace(/\/{2,}/g, '/').replace(/\s+/g, ' '), m;
   if (!s) return null;
+  if ((m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/))) return new Date(+m[1], +m[2] - 1, +m[3], 12);
+  if ((m = s.match(/^(\d{4})[\/\-.](\d{1,2})$/)) && +m[2] <= 12) return new Date(+m[1], +m[2] - 1, 1, 12);
   if ((m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/))) { var y = +m[3]; if (y < 100) y += 2000; return new Date(y, +m[2] - 1, +m[1], 12); }
   if ((m = s.match(/^(\d{1,2})[\/\-.](\d{4})$/))) return new Date(+m[2], +m[1] - 1, 1, 12);
+  if ((m = s.match(/^(\d{1,2})[\/\-.](\d{2})$/)) && +m[1] >= 1 && +m[1] <= 12) return new Date(2000 + +m[2], +m[1] - 1, 1, 12);
   if ((m = s.match(/^([a-z]{3})[a-z]*[\/\-. ]+(\d{2,4})$/)) && MESES_CORTOS[m[1]] !== undefined) {
     var a = +m[2]; if (a < 100) a += 2000; return new Date(a, MESES_CORTOS[m[1]], 1, 12);
   }
@@ -51,89 +52,6 @@ function diasDesde_(f) {
   return Math.round((h.getTime() - d.getTime()) / 864e5);
 }
 
-/* ---------------- lectura del kardex ---------------- */
-
-/** Productos del Catálogo Maestro que tienen planilla de kardex */
-function catalogo_() {
-  var ss = SpreadsheetApp.openById(cfg_('maestroId'));
-  var sh = ss.getSheetByName(cfg_('maestroHoja') || 'catalogo');
-  if (!sh) throw new Error('No encuentro la pestaña "' + (cfg_('maestroHoja') || 'catalogo') + '" en el Catálogo Maestro.');
-  var lr = sh.getLastRow();
-  if (lr < 3) return [];
-  return sh.getRange(3, 1, lr - 2, 11).getValues()
-    .filter(function (r) { return r[0] && r[4] && r[5]; })
-    .map(function (r) {
-      return {
-        codigo: String(r[0]).trim(), desc: String(r[1] || ''), proveedor: String(r[2] || ''), marca: String(r[3] || ''),
-        sid: sheetIdDe_(r[4]), hoja: String(r[5]).trim(), precioOC: num_(r[6]), minimo: num_(r[8])
-      };
-    })
-    .filter(function (p) { return p.sid; });
-}
-
-/** Unidades de una pestaña de kardex */
-function leerUnidades_(sid, hoja) {
-  var sh = SpreadsheetApp.openById(sid).getSheetByName(hoja);
-  if (!sh) throw new Error('No existe la pestaña "' + hoja + '"');
-  var lr = sh.getLastRow();
-  var units = [];
-  if (lr >= KARDEX_FILA_INICIO) {
-    var vals = sh.getRange(KARDEX_FILA_INICIO, 1, lr - KARDEX_FILA_INICIO + 1, 10).getValues();
-    vals.forEach(function (r, i) {
-      var lote = String(r[3] || '').trim();
-      var cant = typeof r[2] === 'number' ? r[2] : num_(r[2]);
-      if (!lote || !cant) return;
-      var rcc = String(r[7] || '').trim();
-      units.push({ fila: KARDEX_FILA_INICIO + i, lote: lote, vto: textoVto_(r[4]), vtoD: parseVto_(r[4]), cant: cant, rcc: rcc, disp: !rcc && cant === 1,
-        ingreso: r[1] instanceof Date ? r[1] : aFecha_(r[1]), remito: String(r[5] || ''), egreso: r[6] instanceof Date ? r[6] : aFecha_(r[6]),
-        mp: String(r[8] || ''), factura: String(r[9] || '') });
-    });
-  }
-  return { sh: sh, units: units, ultima: ultimaFilaAJ_(sh) };
-}
-
-/** Última fila con algo escrito entre A y J (para agregar debajo sin chocar con fórmulas de otras columnas) */
-function ultimaFilaAJ_(sh) {
-  var lr = sh.getLastRow();
-  if (!lr) return 0;
-  var v = sh.getRange(1, 1, lr, 10).getValues();
-  for (var i = v.length - 1; i >= 0; i--) if (v[i].join('') !== '') return i + 1;
-  return 0;
-}
-
-function resumenUnidades_(units) {
-  var lotes = {}, disp = 0;
-  units.forEach(function (u) {
-    var l = lotes[u.lote] || (lotes[u.lote] = { vto: u.vto, vtoIso: u.vtoD ? Utilities.formatDate(u.vtoD, TZ, 'yyyy-MM-dd') : '', disp: 0, total: 0 });
-    l.total += u.cant;
-    if (u.disp) { l.disp++; disp++; }
-  });
-  return { lotes: lotes, disp: disp };
-}
-
-/* ---------------- pestaña Stock ---------------- */
-
-function leerStock_() {
-  return leer_('Stock').map(function (r) {
-    try { r.lotes = r.lotes ? JSON.parse(r.lotes) : {}; } catch (e) { r.lotes = {}; }
-    r.disp = num_(r.disp); r.minimo = num_(r.minimo);
-    return r;
-  });
-}
-
-function escribirStock_(lista) {
-  var sh = hoja_('Stock'), h = heads_(sh);
-  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, h.length).clearContent();
-  if (!lista.length) return;
-  var rows = lista.map(function (s) {
-    var o = {}; for (var k in s) o[k] = s[k];
-    o.lotes = JSON.stringify(s.lotes || {});
-    return filaDe_(h, 'Stock', o);
-  });
-  if (sh.getMaxRows() < rows.length + 1) sh.insertRowsAfter(sh.getMaxRows(), rows.length + 1 - sh.getMaxRows());
-  sh.getRange(2, 1, rows.length, h.length).setValues(rows);
-}
-
 /** Índice para encontrar el producto de stock de un ítem (por código y, si no, por descripción) */
 function indiceStock_(stock) {
   var porCod = {}, porDesc = {};
@@ -141,69 +59,6 @@ function indiceStock_(stock) {
   return function (codigo, desc) {
     return (codigo && porCod[ncode_(codigo)]) || (desc && porDesc[norm_(desc)]) || null;
   };
-}
-
-/** Vuelve a leer un producto y actualiza su fila en Stock */
-function refrescarProducto_(s) {
-  try {
-    var r = resumenUnidades_(leerUnidades_(s.sid, s.hoja).units);
-    s.lotes = r.lotes; s.disp = r.disp; s.error = ''; s.leido = new Date();
-  } catch (e) { s.error = String(e.message || e); }
-  var sh = hoja_('Stock'), h = heads_(sh);
-  var o = {}; for (var k in s) o[k] = s[k];
-  o.lotes = JSON.stringify(s.lotes || {});
-  if (s._fila) reemplazarFila_('Stock', s._fila, o);
-}
-
-/**
- * Lee el kardex de a tandas (la app llama varias veces: cada llamada tiene que entrar en el minuto de Vercel).
- * Devuelve { total, hechos, siguiente (null si terminó), errores }
- */
-function kardexSync(desde, cuantos) {
-  verificar_();
-  desde = Number(desde) || 0; cuantos = Number(cuantos) || 25;
-  var cat = catalogo_();
-  var lote = cat.slice(desde, desde + cuantos);
-  var leidos = lote.map(function (p) {
-    var s = {}; for (var k in p) s[k] = p[k];
-    try { var r = resumenUnidades_(leerUnidades_(p.sid, p.hoja).units); s.lotes = r.lotes; s.disp = r.disp; s.error = ''; }
-    catch (e) { s.lotes = {}; s.disp = 0; s.error = String(e.message || e); }
-    s.leido = new Date();
-    return s;
-  });
-  var lock = LockService.getScriptLock(); lock.waitLock(30000);
-  try {
-    var actual = leerStock_(), porCod = {};
-    actual.forEach(function (s) { delete s._fila; porCod[ncode_(s.codigo)] = s; });
-    leidos.forEach(function (s) { porCod[ncode_(s.codigo)] = s; });
-    var termino = desde + cuantos >= cat.length;
-    if (termino) {
-      var validos = {}; cat.forEach(function (p) { validos[ncode_(p.codigo)] = true; });
-      Object.keys(porCod).forEach(function (k) { if (!validos[k]) delete porCod[k]; });
-    }
-    var lista = Object.keys(porCod).map(function (k) { return porCod[k]; })
-      .sort(function (a, b) { return (a.proveedor + a.desc).localeCompare(b.proveedor + b.desc); });
-    escribirStock_(lista);
-    if (termino) setCfg_('kardexLeido', Utilities.formatDate(new Date(), TZ, 'dd/MM/yyyy HH:mm'));
-    return {
-      total: cat.length, hechos: Math.min(desde + cuantos, cat.length), siguiente: termino ? null : desde + cuantos,
-      errores: leidos.filter(function (s) { return s.error; }).length
-    };
-  } finally { lock.releaseLock(); }
-}
-
-/** Lee todo el kardex (menú o disparador nocturno) */
-function kardexSyncTodo() {
-  var t0 = Date.now(), desde = 0, r;
-  do { r = kardexSync(desde, 30); desde = r.siguiente; } while (desde !== null && Date.now() - t0 < 300000);
-  try { SpreadsheetApp.getActive().toast('Kardex leído: ' + r.hechos + ' de ' + r.total + ' productos.'); } catch (e) { }
-  return r;
-}
-
-function activarLecturaDiaria() {
-  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'kardexSyncTodo') ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('kardexSyncTodo').timeBased().everyDays(1).atHour(4).create();
-  try { SpreadsheetApp.getUi().alert('Listo: el kardex se lee todas las noches (4 a 5 h).'); } catch (e) { }
 }
 
 /** Stock para la pantalla de Stock */
@@ -245,6 +100,7 @@ function guardarLotes(numero, lotes) {
  */
 function darBajaConsumo(numero) {
   verificar_();
+  exigirEscrituraKardex_();
   var lock = LockService.getScriptLock(); lock.waitLock(30000);
   try {
     var cons = leer_('Consumos').filter(function (r) { return String(r.numero) === String(numero); })[0];
@@ -269,7 +125,11 @@ function darBajaConsumo(numero) {
           return;
         }
         var usar = cand.slice(0, cant);
-        usar.forEach(function (u) { k.sh.getRange(u.fila, 7, 1, 3).setValues([[fecha, String(numero), mp]]); });
+        usar.forEach(function (u) {
+          k.sh.getRange(u.fila, k.cols.egreso + 1).setValue(fecha);
+          k.sh.getRange(u.fila, k.cols.rcc + 1).setValue(String(numero));
+          if (k.cols.mp !== undefined) k.sh.getRange(u.fila, k.cols.mp + 1).setValue(mp);
+        });
         var texto = fmtFecha_(new Date()) + ' · lote ' + usar[0].lote + ' · fila' + (usar.length > 1 ? 's ' : ' ') +
           usar.map(function (u) { return u.fila; }).join(', ') + (it.lote ? '' : ' · lote asumido');
         reemplazarFila_('Consumo_Items', it._fila, { baja: texto, lote: it.lote || usar[0].lote });
@@ -284,6 +144,7 @@ function darBajaConsumo(numero) {
 /* ---------------- ingreso al kardex desde la recepción ---------------- */
 
 function ingresarRecepcionKardex_(numero) {
+  exigirEscrituraKardex_();
   var rec = leer_('Recepciones').filter(function (r) { return String(r.numero) === String(numero); })[0];
   if (!rec) return null;
   var stock = leerStock_(), buscar = indiceStock_(stock);
@@ -296,14 +157,17 @@ function ingresarRecepcionKardex_(numero) {
     var n = Math.round(num_(it.cant));
     if (!n) return;
     try {
-      var sh = SpreadsheetApp.openById(s.sid).getSheetByName(s.hoja);
-      if (!sh) throw new Error('No existe la pestaña "' + s.hoja + '"');
-      var desde = Math.max(ultimaFilaAJ_(sh), KARDEX_FILA_INICIO - 1) + 1;
+      var k = leerUnidades_(s.sid, s.hoja), sh = k.sh, c = k.cols;
+      var desde = k.ultima + 1;
       var vto = aFecha_(it.vto) || it.vto;
-      var filas = [[n, '', '', '', '', '', '', '-', '', '']];
-      for (var i = 0; i < n; i++) filas.push(['', fecha, 1, String(it.lote), vto, String(rec.remitoProv || ''), '', '', '', String(rec.factura || '')]);
+      var filas = [{ total: n }];
+      for (var i = 0; i < n; i++) filas.push({ ingreso: fecha, cant: 1, lote: String(it.lote), vto: vto, remito: String(rec.remitoProv || ''), factura: String(rec.factura || '') });
       if (sh.getMaxRows() < desde + filas.length - 1) sh.insertRowsAfter(sh.getMaxRows(), desde + filas.length - 1 - sh.getMaxRows());
-      sh.getRange(desde, 1, filas.length, 10).setValues(filas);
+      // columna por columna según el encabezado, sin tocar Saldo ni otras columnas con fórmulas
+      ['total', 'ingreso', 'cant', 'lote', 'vto', 'remito', 'rcc', 'factura'].forEach(function (campo) {
+        if (c[campo] === undefined) return;
+        sh.getRange(desde, c[campo] + 1, filas.length, 1).setValues(filas.map(function (f) { return [f[campo] === undefined ? '' : f[campo]]; }));
+      });
       reemplazarFila_('Recepcion_Items', it._fila, { kardex: 'Cargado ' + fmtFecha_(new Date()) + ' · ' + s.hoja + ' filas ' + desde + '–' + (desde + filas.length - 1) });
       refrescarProducto_(s);
       out.ok++;

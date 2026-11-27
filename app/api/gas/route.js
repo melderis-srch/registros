@@ -9,6 +9,8 @@ const PERMITIDAS = new Set([
   'cambiarEstado', 'subirPdf', 'getCompras', 'generarOCsReposicion', 'getTabla', 'guardarTabla', 'agregarMaestro',
   'getPendientes', 'getStock', 'kardexSync', 'darBajaConsumo', 'guardarLotes', 'getReposicion', 'pasarAOC',
   'getGestion', 'getMovimientos', 'reingresarKardex',
+  // sistema web (public/sistema.html)
+  'dbTodo', 'dbCambios', 'dbSet', 'dbDelete', 'sheetsProxy', 'driveProxy',
 ]);
 
 export async function POST(req) {
