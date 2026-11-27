@@ -51,12 +51,14 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .filters{display:flex;flex-direction:column;gap:8px;padding:12px;border-bottom:1px solid var(--line)}
 .filters input{width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
 .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.seg button{flex:1;border:0;background:transparent;color:var(--muted);padding:6px 4px;font-size:13px}
+.seg{flex-wrap:wrap}
+.seg button{flex:1 1 auto;border:0;background:transparent;color:var(--muted);padding:6px 6px;font-size:12.5px;white-space:nowrap}
 .seg button[aria-pressed="true"]{background:var(--navy);color:#fff}
 .list{overflow:auto;flex:1;min-height:0}
 .month{position:sticky;top:0;background:var(--panel);padding:8px 12px 4px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);z-index:1}
 #list.selmode .item{position:relative;padding-left:36px}#list .pk{position:absolute;left:11px;top:12px;width:16px;height:16px;cursor:pointer;accent-color:#283592}
 .pkbar{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted,#667);background:#f6f8fc}.pkbar input{width:16px;height:16px;accent-color:#283592}.pkbar b{color:#283592}
+.tg{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;color:var(--muted,#667);padding:1px 7px;border:1px solid var(--line);border-radius:999px;background:#fff;cursor:pointer;white-space:nowrap}.tg input{width:13px;height:13px;margin:0;accent-color:#283592;cursor:pointer}.tg.on{color:#1d6b3a;border-color:#b9dcc5;background:#eef8f1}.tg i{font-style:normal;opacity:.75}
 .item{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer;border-left:3px solid transparent}
 .item:hover{background:var(--bg)}
 .item[aria-current="true"]{background:var(--bg);border-left-color:var(--accent)}
@@ -477,7 +479,7 @@ const pending = new Map();
 
 const FILTROS = {
   pen:[["todos","Todo"],["urg","Urgente"]],
-  rcc:[["todos","Todos"],["rev","Revisar"],["faltan","Faltan"],["listos","Completos"]],
+  rcc:[["todos","Todos"],["rev","Revisar"],["faltan","Faltan"],["listos","Completos"],["singen","Sin RCC"],["sinbaja","Sin baja"]],
   rem:[["todos","Todos"],["pend","Sin retorno"],["ret","Retornados"]],
   oc:[["todos","Todas"],["emit","Emitidas"],["env","Enviadas"],["rec","Recibidas"]],
   rec:[["todos","Todas"]],
@@ -535,7 +537,7 @@ function renderStats(){
   if (mod==="stk"){ const all=ORDER.stk.map(id=>DATA.stk.get(id)); const bajo=all.filter(k=>bajoMin(k)).length; const m=DATA.meta;
     s.innerHTML=`<span class="stat"><b>${all.length}</b> productos</span><span class="stat"><b>${bajo}</b> bajo mínimo</span><span class="stat"><b>${bajasPendientes().length}</b> bajas pendientes</span>${m&&m.sync?`<span class="stat">kardex leído ${esc(m.sync)}</span>`:""}`; return; }
   if (mod==="rcc"){ const all=ORDER.rcc.map(id=>DATA.rcc.get(id)); const ok=all.filter(completo).length, rev=all.filter(r=>estado(r)[0]==="rev").length;
-    s.innerHTML=`<span class="stat"><b>${all.length}</b> cirugías</span><span class="stat"><b>${ok}</b> completos</span><span class="stat"><b>${rev}</b> a revisar</span>`; }
+    s.innerHTML=`<span class="stat"><b>${all.length}</b> cirugías</span><span class="stat"><b>${ok}</b> completos</span><span class="stat"><b>${rev}</b> a revisar</span><span class="stat"><b>${all.filter(r=>!rccGen(r)).length}</b> sin RCC generado</span><span class="stat"><b>${all.filter(r=>!rccBaja(r)).length}</b> sin baja kardex</span>`; }
   if (mod==="rem"){ const all=ORDER.rem.map(id=>DATA.rem.get(id)); s.innerHTML=`<span class="stat"><b>${all.length}</b> remitos</span><span class="stat"><b>${all.filter(x=>!x.retorno).length}</b> sin retorno</span>`; }
   if (mod==="oc"){ const all=ORDER.oc.map(id=>DATA.oc.get(id)); const pend=pendientes(); const provs=new Set(pend.map(x=>x.prov)).size;
     s.innerHTML=`<span class="stat"><b>${all.length}</b> OC</span><span class="stat"><b>${pend.length}</b> ítems para reponer (${provs} proveedores)</span>`; }
@@ -622,14 +624,14 @@ function renderList(){
   if (mod==="sgc") html = listaSgc();
   if (mod==="rcc") for (const id of ORDER.rcc){
     const r=DATA.rcc.get(id); const [cls,lab]=estado(r); const f=filtro.rcc;
-    if (f==="faltan"&&cls!=="warn"||f==="rev"&&cls!=="rev"||f==="listos"&&cls!=="ok") continue;
+    if (f==="faltan"&&cls!=="warn"||f==="rev"&&cls!=="rev"||f==="listos"&&cls!=="ok"||f==="singen"&&rccGen(r)||f==="sinbaja"&&rccBaja(r)) continue;
     if (q && !norm(`${r.rcc} ${r.paciente} ${r.medico} ${r.institucion} ${r.cirugia}`).includes(q)) continue;
     const extra = (r.remitoTransp?`<span class="chip mute">R ${esc(r.remitoTransp)}</span>`:"") + (ocsDe(r).length?`<span class="chip mute">OC ${ocsDe(r).join(", ")}</span>`:"");
     html += head(r.fecha) + `<div class="item" role="button" tabindex="0" data-id="${id}" aria-current="${id===sel.rcc}">
       <span class="n">${esc(r.rcc)}</span><span class="p">${esc(r.paciente)}</span>
       <span class="chips"><span class="chip ${cls}">${cls==="ok"?`${prods(r).length} prod.`:lab}</span></span>
       <span class="f">${esc(fCorta(r.fecha))}</span><span class="s">${esc(r.medico)} · ${esc(r.cirugia)}</span>
-      ${extra?`<span class="chips" style="grid-column:1/4;justify-content:flex-start">${extra}</span>`:""}</div>`;
+      <span class="chips" style="grid-column:1/4;justify-content:flex-start">${extra}${tglRCC(r)}</span></div>`;
   }
   if (mod==="rem") for (const id of ORDER.rem){
     const x=DATA.rem.get(id); const f=filtro.rem;
@@ -816,7 +818,7 @@ function renderMain(){
   if (!x){ main.innerHTML=`<div class="empty">${mod==="rcc"?"Elegí una cirugía de la lista.":mod==="rem"?"No hay remitos todavía. Se arman desde una cirugía (botón “Hacer remito”) o con “+ Remito suelto”.":"No hay OC todavía. Con “Reponer pendientes” pasás lo consumido en los RCC a una OC, o armá una “OC suelta”."}</div>`; return; }
   if (mod==="rcc"){
     const rem=[...DATA.rem.values()].filter(m=>m.cxId===id);
-    main.innerHTML=`<div class="bar"><div class="txt">Lista de cirugías: <b>${esc(x.cirugia||"—")}</b></div>
+    main.innerHTML=`<div class="bar"><div class="txt">Lista de cirugías: <b>${esc(x.cirugia||"—")}</b> ${tglRCC(x,true)}</div>
       <div class="links">${rem.length?rem.map(m=>`<button class="btn small" data-go="rem:${m._id}">Ver remito ${esc(m.numero)}</button>`).join(""):`<button class="btn small" data-act="hacerRem">Hacer remito</button>`}
       ${ocsDe(x).map(n=>`<button class="btn small" data-go="oc:o${n}">Ver OC ${n}</button>`).join("")}
       ${x.pdf?`<a class="btn small" href="${esc(x.pdf)}" target="_blank" rel="noopener">PDF en Drive</a>`:""}
@@ -1187,6 +1189,7 @@ const acciones = {
   async pdf(e){ const id=sel[mod], x=id&&DATA[mod].get(id); if(!x) return; const b=e.target.closest("button"); const t=b.textContent; const dl=!!b.dataset.dl||!carpeta(mod); if(dl&&!downloads) return; b.disabled=true; b.textContent="Generando…";
     try{ const html=mod==="rcc"?paperRCC(x,false):mod==="rem"?paperRem(x,false):mod==="rec"?paperRec(x):paperOC(x,false); const nom=mod==="rcc"?nombreRCC(x):mod==="rem"?nombreRem(x):mod==="rec"?limpiaNombre(nombreArchRec(x)):nombreOC(x);
       const blob=await pdfDe(mod, x);
+      if(mod==="rcc"&&!rccGen(x)){ x.rccGen=hoy(); guardar(mod,id,true); }
       if(dl) await guardarArchivo(nom+".pdf", blob);
       else { b.textContent="Subiendo a Drive…"; const f=await subirDrive(mod, x.fecha||x.emision, nom+".pdf", blob); x.pdf=f.url; x.pdfFecha=hoy(); await guardar(mod,id,true); avisoLink(`${nom}.pdf guardado en Drive.`, f.url); } }
     catch(err){ aviso("No se pudo guardar el PDF: "+errDrive(err)); }
@@ -1223,7 +1226,7 @@ try{ if(localStorage.getItem("sb_colap")==="1") document.body.classList.add("col
 document.querySelector("[data-colapsar]").addEventListener("click", ()=>{ const c=document.body.classList.toggle("colap"); try{ localStorage.setItem("sb_colap", c?"1":"0"); }catch(e){} });
 document.querySelector(".tabs").addEventListener("click", e => { const b=e.target.closest("[data-mod]"); if(!b) return; mod=b.dataset.mod; panel=null; sgcPanel=null; hoyPanel=null; if(mod==="sgc"){ sgcRec=null; sel.sgc="_res"; } render(); });
 document.getElementById("seg").addEventListener("click", e => { const b=e.target.closest("[data-f]"); if(!b) return; filtro[mod]=b.dataset.f; render(); });
-document.getElementById("list").addEventListener("click", e => { if(e.target.closest(".pk,.pkall")) return; const it=e.target.closest(".item"); if(!it||!it.dataset.id) return; sel[mod]=it.dataset.id; panel=null; if(mod==="sgc"){ sgcRec=null; sgcPanel=null; } renderList(); renderMain(); });
+document.getElementById("list").addEventListener("click", e => { if(e.target.closest(".pk,.pkall,.tg")) return; const it=e.target.closest(".item"); if(!it||!it.dataset.id) return; sel[mod]=it.dataset.id; panel=null; if(mod==="sgc"){ sgcRec=null; sgcPanel=null; } renderList(); renderMain(); });
 document.getElementById("list").addEventListener("keydown", e => { if(e.key==="Enter"&&e.target.classList.contains("item")) e.target.click(); });
 document.getElementById("q").addEventListener("input", e => { busqueda=e.target.value; renderList(); });
 
@@ -2118,6 +2121,14 @@ document.getElementById("list").addEventListener("change", e=>{ const P=PICK[mod
 document.getElementById("list").addEventListener("click", e=>{ if(e.target.classList.contains("pkclr")){ e.preventDefault(); PICK[mod]?.clear(); pickActualizar(); } });
 function paraImprimir(m){ const P=PICK[m]; if(P&&P.size) return ORDER[m].filter(id=>P.has(id)).map(id=>DATA[m].get(id)).filter(Boolean);
   return [...document.querySelectorAll("#list .item[data-id]")].map(el=>DATA[m].get(el.dataset.id)).filter(Boolean); }
+
+// ---------------- RCC: marcas de "RCC generado" y "baja en kardex" ----------------
+function rccGen(r){ return r.rccGen==="no"?"":r.rccGen||(r.pdf?(r.pdfFecha||"sí"):""); }
+function rccBaja(r){ return r.bajaKardex==="no"?"":r.bajaKardex||(prods(r).length&&prods(r).every(p=>p.baja)?"sí":""); }
+function tglRCC(r,grande){ const g=rccGen(r), k=rccBaja(r); const f=v=>v&&v!=="sí"?` <i>${esc(fCorta(v))}</i>`:"";
+  return `<label class="tg ${g?"on":""}" title="Marcá cuando el RCC ya está generado"><input type="checkbox" data-rcctg="rccGen" data-rid="${r._id}" ${g?"checked":""}>RCC generado${grande?f(g):""}</label> <label class="tg ${k?"on":""}" title="Marcá cuando ya se dio de baja en el kardex"><input type="checkbox" data-rcctg="bajaKardex" data-rid="${r._id}" ${k?"checked":""}>Baja en kardex${grande?f(k):""}</label>`; }
+document.addEventListener("change",e=>{ const el=e.target.closest&&e.target.closest("[data-rcctg]"); if(!el) return; const r=DATA.rcc.get(el.dataset.rid); if(!r) return;
+  const k=el.dataset.rcctg; r[k]=el.checked?hoy():"no"; guardar("rcc",r._id,true); renderList(); if(sel.rcc===r._id&&mod==="rcc") renderMain(); });
 // ---------------- migración a la app web (planilla Surchérie Registros › AppDB) ----------------
 Object.assign(acciones,{ async exportarWeb(e){
   const b=e.target.closest("button"); const tx=b.textContent; b.disabled=true; b.textContent="Leyendo AppDB…";
