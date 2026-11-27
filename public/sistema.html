@@ -161,6 +161,10 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 /* ---------- Hojas (siempre blancas, como impresas) ---------- */
 .paper{width:794px;margin:0 auto;background:#fff;color:#111;padding:26px 27px;font:12.5px/1.25 Roboto, Arial, sans-serif;box-shadow:0 1px 3px rgba(0,0,0,.15)}
 .paper table{width:100%;border-collapse:collapse;table-layout:fixed}
+.prec td{font-size:11px}.prec .navy td{background:#283592;height:14px;border-color:#283592}.prec .sp td{border:0;height:10px}
+.prec .rr td{height:46px}.prec .w{white-space:normal}.prec .ft td{height:30px}.prec .c{text-align:center}.prec .peach td{text-align:center}
+.recform{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:end;margin:0 0 12px}.recform label{display:flex;flex-direction:column;font-size:12px;color:var(--muted,#667)}.recform input{font:inherit;padding:5px 8px;border:1px solid #ccd;border-radius:6px;min-width:120px}
+
 .paper td{border:1px solid #c9c9c9;padding:2px 4px;height:21px;vertical-align:middle;overflow:hidden;white-space:nowrap}
 .paper .thick td{border-top:2px solid #111}
 .paper .b{font-weight:700}
@@ -822,6 +826,7 @@ function renderMain(){
     main.innerHTML=`<div class="bar"><div class="txt">Recepción de la OC <b>${esc(x.oc)}</b> · ${x.kardexOk?`<span class="ok-t">cargada en el kardex</span>`:`<span class="warn-t">${esc(x.kardexMsg||"no se cargó en el kardex")}</span>`}</div>
       <div class="links">${x.ocId&&DATA.oc.has(x.ocId)?`<button class="btn small" data-go="oc:${x.ocId}">Ver OC</button>`:""}${!x.kardexOk&&(x.items||[]).some(i=>i.k&&i.lote&&!i.enKardex)?`<button class="btn small" data-act="kardexRec">Cargar al kardex lo que está listo</button>`:""}</div></div>
       ${x.revisar?`<div class="note warn">${esc(x.revisar)}</div>`:""}${(x.items||[]).some(i=>i.estado&&i.estado!=="Listo"&&!i.enKardex)?`<div class="note">${(x.items||[]).filter(i=>i.estado&&i.estado!=="Listo"&&!i.enKardex).map(i=>`<div>${esc(i.desc)} · lote ${esc(i.lote||"—")}: <b>${esc(i.estado)}</b></div>`).join("")}</div>`:""}
+      <div class="recform">${[["fecha","Fecha recepción"],["descripcion","Descripción/modelo"],["marca","Marca"],["origen","Origen"],["fechaRev","Fecha revisión"]].map(([k,t])=>`<label>${t}<input data-recf="${k}" value="${esc(x[k]||"")}"></label>`).join("")}<button class="btn small" data-act="recConforme">Empaque y rótulo: todo conforme</button></div>
       <div class="paperwrap">${paperRec(x)}</div>`;
   }
   if (mod==="rem"){
@@ -1009,22 +1014,29 @@ function renderRecibir(){
     <div class="grp"><button class="btn primary" data-act="guardarRec">Guardar recepción y cargar en kardex</button><button class="btn" data-act="cerrarPanel">Cancelar</button></div></div>`;
 }
 function recibidoDe(o, desc){ return [...DATA.rec.values()].filter(r=>r.ocId===o._id).reduce((a,r)=>a+(r.items||[]).filter(i=>norm(i.desc)===norm(desc)).reduce((b,i)=>b+toNum(i.cant),0),0); }
+function nombreArchRec(x){ const m=String(x.fecha||"").match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); const f=m?`${+m[1]}-${+m[2]}-${String(m[3]).slice(-2)}`:""; return `${f} OC ${x.oc||"s-n"}`.trim(); }
 function paperRec(x){
-  const filas=(x.items||[]).map(i=>`<tr><td class="c">${esc(i.codigo)}</td><td colspan="2">${esc(i.desc)}</td><td class="c">${esc(i.lote)}</td><td class="c">${esc(i.vto)}</td><td class="c">${esc(i.cant)}</td><td class="c">${esc(i.empaque)}</td><td class="c">${esc(i.rotulo)}</td></tr>`).join("");
-  const vacias=Math.max(0,14-(x.items||[]).length);
-  return `<div class="paper"><table>
-    <colgroup><col style="width:13%"><col style="width:14%"><col style="width:15%"><col style="width:13%"><col style="width:12%"><col style="width:9%"><col style="width:12%"><col style="width:12%"></colgroup>
-    <tr class="hdr thick"><td colspan="3"><img src="${LOGO}" alt="Surchérie"></td><td colspan="3" class="tit">RECEPCIÓN- INSPECCIÓN DE PRODUCTOS MEDICOS</td><td colspan="2" class="form">FORM- POE 15-01<br>REVISIÓN 3</td></tr>
-    <tr class="gap"><td colspan="8"></td></tr>
-    <tr class="thick"><td colspan="2" class="b">ORDEN DE COMPRA Nº:</td><td>${esc(x.oc)}</td><td class="b">PROVEEDOR:</td><td colspan="2">${esc(x.proveedor)}</td><td class="b">ORIGEN:</td><td>${esc(x.origen)}</td></tr>
-    <tr><td colspan="2" class="b">REMITO PROV. Nº:</td><td colspan="2">${esc(x.remitoProv)}</td><td colspan="2" class="b">FACTURA PROV. Nº:</td><td colspan="2">${esc(x.factura)}</td></tr>
-    <tr><td colspan="2" class="b">FECHA RECEPCIÓN:</td><td colspan="2">${esc(x.fecha)}</td><td colspan="2" class="b">CANTIDAD TOTAL:</td><td colspan="2">${(x.items||[]).reduce((a,i)=>a+toNum(i.cant),0)}</td></tr>
-    <tr class="gap"><td colspan="8"></td></tr>
-    <tr class="thick peach"><td class="c">CÓDIGO</td><td colspan="2">PRODUCTO</td><td class="c">LOTE</td><td class="c">FECHA VTO</td><td class="c">CANT.</td><td class="c">EMPAQUE</td><td class="c">RÓTULO</td></tr>
-    ${filas}${"<tr><td></td><td colspan='2'></td><td></td><td></td><td></td><td></td><td></td></tr>".repeat(vacias)}
-    <tr class="peach"><td colspan="8">OBSERVACIONES</td></tr><tr class="obs"><td colspan="8">${esc(x.obs||"")}</td></tr>
-    <tr class="foot thick"><td colspan="4" rowspan="2">REVISÓ Y MODIFICÓ: BIOING. MELISA DERIS<br>APROBÓ: ING. GUSTAVO COBELLI</td><td class="b">FECHA:</td><td colspan="3">${esc(x.fecha)}</td></tr>
-    <tr class="foot"><td class="b">FIRMA:</td><td colspan="3"></td></tr>
+  const its=x.items||[]; const vac=Math.max(0,9-its.length);
+  const fila=i=>`<tr class="rr"><td class="c">${esc(i.codigo)}</td><td class="c w">${esc(i.desc)}</td><td class="c">${esc(i.lote)}</td><td class="c">${esc(i.vto)}</td><td class="c">${esc(i.cant)}</td><td class="c">${esc(i.empaque||"")}</td><td class="c" colspan="2">${esc(i.rotulo||"")}</td><td class="c w" colspan="2">${esc(i.obsItem||"")}</td></tr>`;
+  return `<div class="paper prec"><table>
+    <colgroup>${[108,130,112,90,84,104,112,75,75,49].map(w=>`<col style="width:${(w/939*100).toFixed(2)}%">`).join("")}</colgroup>
+    <tr class="navy"><td colspan="10"></td></tr>
+    <tr class="hdr"><td colspan="3"><img src="${LOGO}" alt="Surchérie"></td><td colspan="4" class="tit">RECEPCIÓN- INSPECCIÓN DE PRODUCTOS MEDICOS</td><td colspan="3" class="form">FORM- POE 15-01<br>REVISIÓN 3</td></tr>
+    <tr class="sp"><td colspan="10"></td></tr>
+    <tr><td colspan="2" class="b">VTP/ NP Nº/ ORDEN DE COMPRA:</td><td colspan="8">${esc(x.oc)}</td></tr>
+    <tr><td colspan="2" class="b">DESCRIPCIÓN/MODELO:</td><td colspan="8">${esc(x.descripcion||"")}</td></tr>
+    <tr><td class="b">PROVEEDOR:</td><td colspan="2" class="c">${esc(x.proveedor)}</td><td class="b">MARCA:</td><td colspan="3">${esc(x.marca||"")}</td><td class="b c">ORIGEN:</td><td colspan="2">${esc(x.origen||"")}</td></tr>
+    <tr><td colspan="2" class="b">REMITO PROVEEDOR Nº:</td><td colspan="3">${esc(x.remitoProv)}</td><td colspan="2" class="b c">FACTURA PROVEEDOR Nº:</td><td colspan="3">${esc(x.factura)}</td></tr>
+    <tr><td colspan="2" class="b">FECHA RECEPCION:</td><td colspan="8">${esc(x.fecha)}</td></tr>
+    <tr><td colspan="2" class="b">CANTIDAD TOTAL:</td><td colspan="8">${its.reduce((a,i)=>a+toNum(i.cant),0)}</td></tr>
+    <tr class="sp"><td colspan="10"></td></tr>
+    <tr class="peach c"><td rowspan="2">CÓDIGO</td><td rowspan="2">PRODUCTO</td><td rowspan="2">LOTE</td><td rowspan="2">FECHA VTO</td><td rowspan="2">CANT. UNIT.</td><td colspan="3">INSPECCIÓN VISUAL</td><td colspan="2" rowspan="2">OBSERVACIONES</td></tr>
+    <tr class="peach c"><td>EMPAQUE</td><td colspan="2">RÓTULO</td></tr>
+    ${its.map(fila).join("")}${`<tr class="rr"><td></td><td></td><td></td><td></td><td></td><td></td><td colspan="2"></td><td colspan="2"></td></tr>`.repeat(vac)}
+    <tr class="sp"><td colspan="10"></td></tr>
+    <tr class="ft"><td colspan="4" rowspan="2" class="b w">REVISÓ Y MODIFICÓ: BIOING. MELISA DERIS<br>APROBO: ING. GUSTAVO COBELLI</td><td class="b">FECHA:</td><td class="b">${esc(x.fechaRev||"")}</td><td colspan="2">Nombre del archivo</td><td colspan="2" class="w">${esc(nombreArchRec(x))}</td></tr>
+    <tr class="ft"><td colspan="2" class="b">FIRMA:</td><td colspan="4"></td></tr>
+    <tr class="navy"><td colspan="10"></td></tr>
   </table></div>`;
 }
 async function guardarRecepcion(btn){
@@ -1169,7 +1181,7 @@ const acciones = {
     if (mod==="oc") for (const rid of x.rccs||[]){ const r=DATA.rcc.get(rid); if(r){ (r.productos||[]).forEach(p=>{ if(p&&+p.oc===+x.numero) delete p.oc; }); await guardar("rcc",rid,true); } }
     sel[mod]=ORDER[mod][0]||null; render(); },
   async pdf(e){ const id=sel[mod], x=id&&DATA[mod].get(id); if(!x) return; const b=e.target.closest("button"); const t=b.textContent; const dl=!!b.dataset.dl||!carpeta(mod); if(dl&&!downloads) return; b.disabled=true; b.textContent="Generando…";
-    try{ const html=mod==="rcc"?paperRCC(x,false):mod==="rem"?paperRem(x,false):mod==="rec"?paperRec(x):paperOC(x,false); const nom=mod==="rcc"?nombreRCC(x):mod==="rem"?nombreRem(x):mod==="rec"?limpiaNombre(`Recepcion ${x.fecha.replace(/\//g,"-")} OC ${x.oc} ${x.proveedor}`):nombreOC(x);
+    try{ const html=mod==="rcc"?paperRCC(x,false):mod==="rem"?paperRem(x,false):mod==="rec"?paperRec(x):paperOC(x,false); const nom=mod==="rcc"?nombreRCC(x):mod==="rem"?nombreRem(x):mod==="rec"?limpiaNombre(nombreArchRec(x)):nombreOC(x);
       const blob=await pdfDe(mod, x);
       if(dl) await guardarArchivo(nom+".pdf", blob);
       else { b.textContent="Subiendo a Drive…"; const f=await subirDrive(mod, x.fecha||x.emision, nom+".pdf", blob); x.pdf=f.url; x.pdfFecha=hoy(); await guardar(mod,id,true); avisoLink(`${nom}.pdf guardado en Drive.`, f.url); } }
@@ -2048,8 +2060,9 @@ Object.assign(acciones,{
       let act=0;
       for (const x of lista){ const prev=DATA.rec.get(x._id);
         if(prev){ if(prev.kardexOk||(prev.items||[]).some(i=>i.enKardex)) continue;
-          if(JSON.stringify(prev.items)===JSON.stringify(x.items)&&prev.revisar===x.revisar) continue;
-          DATA.rec.set(x._id,{...prev,items:x.items,revisar:x.revisar}); await guardar("rec",x._id,true); act++; continue; }
+          const nv={...prev,items:x.items,revisar:x.revisar,marca:prev.marca||x.marca||"",descripcion:prev.descripcion||x.descripcion||""};
+          if(JSON.stringify(nv)===JSON.stringify(prev)) continue;
+          DATA.rec.set(x._id,nv); await guardar("rec",x._id,true); act++; continue; }
         DATA.rec.set(x._id,x); ORDER.rec.push(x._id); await guardar("rec",x._id,true); n++; }
       render(); aviso(n||act?`Listo: ${n} recepciones nuevas${act?` y ${act} actualizadas`:""}. Revisá las marcadas y cargá las listas al kardex.`:"Ya estaban todas las recepciones al día.","ok");
     }catch(err){ aviso("No se pudo traer: "+errTxt(err)); } finally{ b.disabled=false; b.textContent=t; } },
@@ -2059,6 +2072,10 @@ Object.assign(acciones,{
     for (const [k,x] of l.entries()){ b.textContent=`Cargando ${k+1} de ${l.length}…`; const er=await cargarRecKardex(x); if(er.length) errs.push(`${x.factura}: ${er.join(", ")}`); else ok++; }
     render(); aviso(`${ok} recepciones cargadas en el kardex.${errs.length?" Con error: "+errs.join(" · "):""}`, errs.length?"err":"ok"); }
 });
+
+document.addEventListener("change",e=>{ const el=e.target.closest&&e.target.closest("[data-recf]"); if(!el||mod!=="rec") return; const x=DATA.rec.get(sel.rec); if(!x) return;
+  x[el.dataset.recf]=el.value.trim(); guardar("rec",x._id,true); const pw=document.querySelector(".paperwrap"); if(pw) pw.innerHTML=paperRec(x); });
+Object.assign(acciones,{ recConforme(){ const x=DATA.rec.get(sel.rec); (x.items||[]).forEach(i=>{ i.empaque=i.empaque||"conforme"; i.rotulo=i.rotulo||"conforme"; }); if(!x.fechaRev) x.fechaRev=new Date().toLocaleDateString("es-AR"); guardar("rec",x._id,true); renderMain(); } });
 // ---------------- migración a la app web (planilla Surchérie Registros › AppDB) ----------------
 Object.assign(acciones,{ async exportarWeb(e){
   const b=e.target.closest("button"); const tx=b.textContent; b.disabled=true; b.textContent="Leyendo AppDB…";
