@@ -55,6 +55,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .seg button[aria-pressed="true"]{background:var(--navy);color:#fff}
 .list{overflow:auto;flex:1;min-height:0}
 .month{position:sticky;top:0;background:var(--panel);padding:8px 12px 4px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);z-index:1}
+#list.selmode .item{position:relative;padding-left:36px}#list .pk{position:absolute;left:11px;top:12px;width:16px;height:16px;cursor:pointer;accent-color:#283592}
+.pkbar{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted,#667);background:#f6f8fc}.pkbar input{width:16px;height:16px;accent-color:#283592}.pkbar b{color:#283592}
 .item{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer;border-left:3px solid transparent}
 .item:hover{background:var(--bg)}
 .item[aria-current="true"]{background:var(--bg);border-left-color:var(--accent)}
@@ -512,10 +514,10 @@ function renderActions(){
       : `<button class="btn primary" data-act="pdf" data-dl="1">PDF de ${nombres[mod]}</button>`) : "";
   const carpBtn = nombres[mod] ? `<button class="btn" data-act="carpetas" title="Elegir carpetas de Drive">Carpetas Drive</button><button class="btn" data-act="imprimir" title="Imprimir este documento">Imprimir</button>` : "";
   if (mod==="pen") a.innerHTML = `<button class="btn" data-act="armarOC">Reponer pendientes</button><button class="btn" data-act="bajasPend">Bajas pendientes</button><button class="btn primary" data-act="syncKardex">Actualizar desde kardex</button>`;
-  if (mod==="rcc") a.innerHTML = `${window.SISTEMA_WEB?"":`<button class="btn" data-act="exportar" title="Copia los RCC a la planilla de la app del equipo (solo los que no estén)">Pasar a la app del equipo</button>`}<button class="btn" data-act="nuevaCx">+ Nueva cirugía</button><button class="btn" data-act="imprimirLista" title="Arma un solo PDF con los RCC que se ven en la lista (según filtro y búsqueda)">Imprimir lista</button>${carpBtn}<button class="btn" data-act="zip">${enDrive?"Completos sin PDF a Drive":"Todos los completos (.zip)"}</button>${pdfBtns}`;
-  if (mod==="rem") a.innerHTML = `<button class="btn" data-act="nuevoRem">+ Remito suelto</button><button class="btn" data-act="imprimirVisibles" title="Arma un solo PDF con todo lo que se ve en la lista (según filtro y búsqueda), listo para imprimir">Imprimir lista</button>${carpBtn}${pdfBtns}`;
-  if (mod==="oc") a.innerHTML = `<button class="btn" data-act="nuevaOC">+ OC suelta</button><button class="btn" data-act="armarOC">Reponer pendientes</button><button class="btn" data-act="imprimirVisibles" title="Arma un solo PDF con todo lo que se ve en la lista (según filtro y búsqueda), listo para imprimir">Imprimir lista</button>${carpBtn}${pdfBtns}`;
-  if (mod==="rec"){ const nl=recsListas().length; a.innerHTML = `${window.SISTEMA_WEB?"":`<button class="btn" data-act="importarIngresos" title="Trae las recepciones armadas desde las facturas de Drive">Traer ingresos de facturas</button>`}${nl?`<button class="btn" data-act="kardexLote" title="Carga en el kardex las recepciones que tienen todo (lote y hoja)">Cargar ${nl} listas al kardex</button>`:""}<button class="btn" data-act="imprimirVisibles" title="Arma un solo PDF con todo lo que se ve en la lista (según filtro y búsqueda), listo para imprimir">Imprimir lista</button>${carpBtn}${pdfBtns}`; }
+  if (mod==="rcc") a.innerHTML = `${window.SISTEMA_WEB?"":`<button class="btn" data-act="exportar" title="Copia los RCC a la planilla de la app del equipo (solo los que no estén)">Pasar a la app del equipo</button>`}<button class="btn" data-act="nuevaCx">+ Nueva cirugía</button><button class="btn" data-act="imprimirLista" title="Arma un solo PDF con los RCC elegidos (o con toda la lista si no elegiste ninguno)">${PICK.rcc.size?`Imprimir ${PICK.rcc.size} elegidos`:"Imprimir lista"}</button>${carpBtn}<button class="btn" data-act="zip">${enDrive?"Completos sin PDF a Drive":"Todos los completos (.zip)"}</button>${pdfBtns}`;
+  if (mod==="rem") a.innerHTML = `<button class="btn" data-act="nuevoRem">+ Remito suelto</button><button class="btn" data-act="imprimirVisibles" title="Arma un solo PDF con los elegidos (o con toda la lista si no elegiste ninguno), listo para imprimir">${PICK[mod]&&PICK[mod].size?`Imprimir ${PICK[mod].size} elegidos`:"Imprimir lista"}</button>${carpBtn}${pdfBtns}`;
+  if (mod==="oc") a.innerHTML = `<button class="btn" data-act="nuevaOC">+ OC suelta</button><button class="btn" data-act="armarOC">Reponer pendientes</button><button class="btn" data-act="imprimirVisibles" title="Arma un solo PDF con los elegidos (o con toda la lista si no elegiste ninguno), listo para imprimir">${PICK[mod]&&PICK[mod].size?`Imprimir ${PICK[mod].size} elegidos`:"Imprimir lista"}</button>${carpBtn}${pdfBtns}`;
+  if (mod==="rec"){ const nl=recsListas().length; a.innerHTML = `${window.SISTEMA_WEB?"":`<button class="btn" data-act="importarIngresos" title="Trae las recepciones armadas desde las facturas de Drive">Traer ingresos de facturas</button>`}${nl?`<button class="btn" data-act="kardexLote" title="Carga en el kardex las recepciones que tienen todo (lote y hoja)">Cargar ${nl} listas al kardex</button>`:""}<button class="btn" data-act="imprimirVisibles" title="Arma un solo PDF con los elegidos (o con toda la lista si no elegiste ninguno), listo para imprimir">${PICK[mod]&&PICK[mod].size?`Imprimir ${PICK[mod].size} elegidos`:"Imprimir lista"}</button>${carpBtn}${pdfBtns}`; }
   if (mod==="hoy"){ const n=sinFirma().length; a.innerHTML=`${window.SISTEMA_WEB?"":`<button class="btn" data-act="exportarWeb" title="Copia todo lo cargado acá a la planilla Surchérie Registros, para usarlo en la app web">Pasar datos a la app web</button>`}<button class="btn" data-act="hoyNuevaCx">+ Nueva cirugía</button>${n?`<button class="btn primary" data-act="hoyFirmar">Firma en lote (${n})</button>`:""}`; return; }
   if (mod==="sgc"){ const r=sgcRec&&DATA.sgc.get(sgcRec); const t=TIPO.get(sel.sgc); const q=r?"del registro":t&&t.plan?(t.plan==="lista"||t.virtual?"del listado":"de la planilla"):"";
     const enD=!!carpeta("sgc"); a.innerHTML=`<button class="btn" data-act="sgcConfig">Configuración</button><button class="btn" data-act="carpetas" title="Elegir carpetas de Drive">Carpetas Drive</button>${q?`<button class="btn" data-act="sgcImprimir">Imprimir</button>${r?(enD?`<button class="btn" data-act="sgcPdf" data-dl="1">Descargar</button><button class="btn primary" data-act="sgcPdf">PDF ${q} a Drive</button>`:`<button class="btn primary" data-act="sgcPdf" data-dl="1">PDF ${q}</button>`):`<button class="btn primary" data-act="sgcPlanilla">PDF ${q}</button>`}`:""}`;
@@ -664,6 +666,7 @@ function renderList(){
         <span class="chips">${k.error?`<span class="chip warn">Error</span>`:b?`<span class="chip warn">Mín ${k.minimo}</span>`:k.minimo?`<span class="chip ok">OK</span>`:""}</span>
         <span class="f">${esc(k.code)}</span><span class="s">${Object.keys(k.lotes||{}).filter(l=>k.lotes[l].disp>0).length} lotes · ${esc(k.hoja)}</span></div>`; }); } }
   document.getElementById("list").innerHTML = html || `<div class="empty">${mod==="stk"&&!ORDER.stk.length?"Todavía no leí el kardex. Tocá “Actualizar desde kardex”.":"Nada para mostrar."}</div>`;
+  marcarSeleccion();
   renderStats();
 }
 
@@ -1220,7 +1223,7 @@ try{ if(localStorage.getItem("sb_colap")==="1") document.body.classList.add("col
 document.querySelector("[data-colapsar]").addEventListener("click", ()=>{ const c=document.body.classList.toggle("colap"); try{ localStorage.setItem("sb_colap", c?"1":"0"); }catch(e){} });
 document.querySelector(".tabs").addEventListener("click", e => { const b=e.target.closest("[data-mod]"); if(!b) return; mod=b.dataset.mod; panel=null; sgcPanel=null; hoyPanel=null; if(mod==="sgc"){ sgcRec=null; sel.sgc="_res"; } render(); });
 document.getElementById("seg").addEventListener("click", e => { const b=e.target.closest("[data-f]"); if(!b) return; filtro[mod]=b.dataset.f; render(); });
-document.getElementById("list").addEventListener("click", e => { const it=e.target.closest(".item"); if(!it||!it.dataset.id) return; sel[mod]=it.dataset.id; panel=null; if(mod==="sgc"){ sgcRec=null; sgcPanel=null; } renderList(); renderMain(); });
+document.getElementById("list").addEventListener("click", e => { if(e.target.closest(".pk,.pkall")) return; const it=e.target.closest(".item"); if(!it||!it.dataset.id) return; sel[mod]=it.dataset.id; panel=null; if(mod==="sgc"){ sgcRec=null; sgcPanel=null; } renderList(); renderMain(); });
 document.getElementById("list").addEventListener("keydown", e => { if(e.key==="Enter"&&e.target.classList.contains("item")) e.target.click(); });
 document.getElementById("q").addEventListener("input", e => { busqueda=e.target.value; renderList(); });
 
@@ -1263,7 +1266,7 @@ async function imprimirPDF(blob, nombre){
   await guardarArchivo(nombre, blob);
   aviso("Abrí el PDF descargado: aparece directo el cuadro de impresión.","ok");
 }
-function rccVisibles(){ return [...document.querySelectorAll("#list .item[data-id]")].map(el=>DATA.rcc.get(el.dataset.id)).filter(Boolean); }
+function rccVisibles(){ return paraImprimir("rcc"); }
 
 // ---------------- Carpetas de Drive ----------------
 const GD = "Google Drive";
@@ -2092,13 +2095,29 @@ async function sincronizarNumeros(rows){
   return camb;
 }
 
-Object.assign(acciones,{ async imprimirVisibles(e){ const ids=[...document.querySelectorAll("#list .item[data-id]")].map(el=>el.dataset.id); const l=ids.map(id=>DATA[mod].get(id)).filter(Boolean);
+Object.assign(acciones,{ async imprimirVisibles(e){ const l=paraImprimir(mod);
   if(!l.length) return aviso("No hay nada en la lista. Usá el buscador o los filtros para elegir qué imprimir.");
   const b=e.target.closest("button"), t=b.textContent; b.disabled=true;
   try{ const htmls=[]; for(const [i,x] of l.entries()){ b.textContent=`Preparando ${i+1} de ${l.length}…`; htmls.push(paperDe(mod,x)); }
     const blob=await pdfHojas(htmls,{imprimir:true}); const nom={rec:"Recepciones",rem:"Remitos",oc:"Ordenes de compra"}[mod]||"Documentos";
     await imprimirPDF(blob, `Imprimir - ${l.length} ${nom}.pdf`); }
   catch(err){ aviso("No se pudo preparar la impresión: "+(err.message||err)); } finally{ b.disabled=false; b.textContent=t; } } });
+
+// ---------------- selección para imprimir en tanda (RCC, recepciones, remitos, OC) ----------------
+const PICK={rcc:new Set(),rec:new Set(),rem:new Set(),oc:new Set()};
+function marcarSeleccion(){ const L=document.getElementById("list"); const ok=!!PICK[mod]; L.classList.toggle("selmode",ok); if(!ok) return;
+  const items=[...L.querySelectorAll(".item[data-id]")]; if(!items.length) return; const P=PICK[mod];
+  items.forEach(it=>{ const c=document.createElement("input"); c.type="checkbox"; c.className="pk"; c.dataset.pk=it.dataset.id; c.checked=P.has(it.dataset.id); c.title="Elegir para imprimir"; it.prepend(c); });
+  const vis=items.map(i=>i.dataset.id), todos=vis.every(id=>P.has(id));
+  const bar=document.createElement("label"); bar.className="pkbar"; bar.innerHTML=`<input type="checkbox" class="pkall" ${todos?"checked":""}> ${P.size?`<b>${P.size} elegidos</b> · <a href="#" class="pkclr">limpiar</a>`:"Elegí cuáles imprimir (o marcá todos los de la lista)"}`;
+  L.prepend(bar); }
+function pickActualizar(){ renderList(); renderActions(); }
+document.getElementById("list").addEventListener("change", e=>{ const P=PICK[mod]; if(!P) return;
+  if(e.target.classList.contains("pk")){ e.target.checked?P.add(e.target.dataset.pk):P.delete(e.target.dataset.pk); pickActualizar(); }
+  if(e.target.classList.contains("pkall")){ const ids=[...document.querySelectorAll("#list .item[data-id]")].map(i=>i.dataset.id); ids.forEach(id=>e.target.checked?P.add(id):P.delete(id)); pickActualizar(); } });
+document.getElementById("list").addEventListener("click", e=>{ if(e.target.classList.contains("pkclr")){ e.preventDefault(); PICK[mod]?.clear(); pickActualizar(); } });
+function paraImprimir(m){ const P=PICK[m]; if(P&&P.size) return ORDER[m].filter(id=>P.has(id)).map(id=>DATA[m].get(id)).filter(Boolean);
+  return [...document.querySelectorAll("#list .item[data-id]")].map(el=>DATA[m].get(el.dataset.id)).filter(Boolean); }
 // ---------------- migración a la app web (planilla Surchérie Registros › AppDB) ----------------
 Object.assign(acciones,{ async exportarWeb(e){
   const b=e.target.closest("button"); const tx=b.textContent; b.disabled=true; b.textContent="Leyendo AppDB…";
