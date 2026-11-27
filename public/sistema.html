@@ -1019,7 +1019,9 @@ function renderRecibir(){
     <div class="grp"><button class="btn primary" data-act="guardarRec">Guardar recepción y cargar en kardex</button><button class="btn" data-act="cerrarPanel">Cancelar</button></div></div>`;
 }
 function recibidoDe(o, desc){ return [...DATA.rec.values()].filter(r=>r.ocId===o._id).reduce((a,r)=>a+(r.items||[]).filter(i=>norm(i.desc)===norm(desc)).reduce((b,i)=>b+toNum(i.cant),0),0); }
-function nombreArchRec(x){ const m=String(x.fecha||"").match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); const f=m?`${+m[1]}-${+m[2]}-${String(m[3]).slice(-2)}`:""; return `${f} OC ${x.oc||"s-n"}`.trim(); }
+function ocCorta(oc){ const d=String(oc||"").replace(/\D/g,"").replace(/^0+/,""); return d?d.slice(-4):""; }
+function provCarpeta(p){ const u=String(p||"SIN PROVEEDOR").toUpperCase(); return /NOVAX/.test(u)?"NOVAX":u.replace(/\s*\(.*?\)\s*/g," ").replace(/\b(S\.?A\.?|S\.?R\.?L\.?|SRL|SA)\b\.?/g,"").replace(/\s+/g," ").trim(); }
+function nombreArchRec(x){ const m=String(x.fecha||"").match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); const f=m?`${+m[1]}-${+m[2]}-${String(m[3]).slice(-2)}`:""; return `${f} OC ${ocCorta(x.oc)||"s-n"}`.trim(); }
 function paperRec(x){
   const its=x.items||[]; const vac=Math.max(0,9-its.length);
   const fila=i=>`<tr class="rr"><td class="c">${esc(i.codigo)}</td><td class="c w">${esc(i.desc)}</td><td class="c">${esc(i.lote)}</td><td class="c">${esc(i.vto)}</td><td class="c">${esc(i.cant)}</td><td class="c">${esc(i.empaque||"")}</td><td class="c" colspan="2">${esc(i.rotulo||"")}</td><td class="c w" colspan="2">${esc(i.obsItem||"")}</td></tr>`;
@@ -1191,7 +1193,7 @@ const acciones = {
       const blob=await pdfDe(mod, x);
       if(mod==="rcc"&&!rccGen(x)){ x.rccGen=hoy(); guardar(mod,id,true); }
       if(dl) await guardarArchivo(nom+".pdf", blob);
-      else { b.textContent="Subiendo a Drive…"; const f=await subirDrive(mod, x.fecha||x.emision, nom+".pdf", blob); x.pdf=f.url; x.pdfFecha=hoy(); await guardar(mod,id,true); avisoLink(`${nom}.pdf guardado en Drive.`, f.url); } }
+      else { b.textContent="Subiendo a Drive…"; const f=await subirDrive(mod, x.fecha||x.emision, nom+".pdf", blob, x.proveedor); x.pdf=f.url; x.pdfFecha=hoy(); await guardar(mod,id,true); avisoLink(`${nom}.pdf guardado en Drive.`, f.url); } }
     catch(err){ aviso("No se pudo guardar el PDF: "+errDrive(err)); }
     finally { b.disabled=false; b.textContent=t; } },
   async zip(e){ const lista=ORDER.rcc.map(id=>DATA.rcc.get(id)).filter(completo); if(!lista.length) return aviso("No hay RCC completos todavía.");
@@ -1275,7 +1277,7 @@ function rccVisibles(){ return paraImprimir("rcc"); }
 const GD = "Google Drive";
 let CARP = {}; // {rcc:{url,id,sub}, rem:…, oc:…, rec:…}
 const TIPOS_CARP = [["rcc","Registros de consumo (RCC)"],["rem","Remitos de transporte"],["oc","Órdenes de compra"],["rec","Recepciones"],["sgc","Registros de calidad (SGC)"]];
-const SUBS = [["","Directo en la carpeta"],["mes","Subcarpeta por mes (NOVIEMBRE)"],["mesanio","Subcarpeta por mes y año (NOVIEMBRE 2026)"],["anio_mes","Año y mes (2026 › NOVIEMBRE)"]];
+const SUBS = [["","Directo en la carpeta"],["mes","Subcarpeta por mes (NOVIEMBRE)"],["mesanio","Subcarpeta por mes y año (NOVIEMBRE 2026)"],["anio_mes","Año y mes (2026 › NOVIEMBRE)"],["prov_anio","Proveedor y año (NOVAX › 2026)"]];
 function carpeta(tipo){ const c=CARP[tipo]; return c&&c.id?c:null; }
 function idCarpeta(s){ s=String(s||"").trim(); const m=s.match(/folders\/([\w-]{10,})/)||s.match(/[?&]id=([\w-]{10,})/); return m?m[1]:(/^[\w-]{20,}$/.test(s)?s:""); }
 async function gd(tool, input){ if(!mcp) throw {code:"capability_disabled"}; const r=await mcp.callTool(GD, tool, input, {cache:false}); return r.payload; }
@@ -1290,11 +1292,12 @@ async function subcarpeta(padre, nombre){
   _subCache.set(k,id); return id;
 }
 function blobB64(blob){ return new Promise((ok,ko)=>{ const fr=new FileReader(); fr.onload=()=>ok(String(fr.result).split(",")[1]); fr.onerror=ko; fr.readAsDataURL(blob); }); }
-async function subirDrive(tipo, fecha, nombre, blob){
+async function subirDrive(tipo, fecha, nombre, blob, prov){
   const c=carpeta(tipo); let padre=c.id; const d=parseF(fecha)||new Date(); const mes=MESES[d.getMonth()].toUpperCase();
   if(c.sub==="mes") padre=await subcarpeta(padre, mes);
   if(c.sub==="mesanio") padre=await subcarpeta(padre, `${mes} ${d.getFullYear()}`);
   if(c.sub==="anio_mes"){ padre=await subcarpeta(padre, String(d.getFullYear())); padre=await subcarpeta(padre, mes); }
+  if(c.sub==="prov_anio"){ padre=await subcarpeta(padre, provCarpeta(prov)); padre=await subcarpeta(padre, String(d.getFullYear())); }
   const f=await gd("create_file",{title:nombre, parentId:padre, base64Content:await blobB64(blob), contentMimeType:"application/pdf", disableConversionToGoogleType:true});
   const id=f.id||(f.file&&f.file.id)||""; return {id, url:f.viewUrl||(f.file&&f.file.viewUrl)||(id?`https://drive.google.com/file/d/${id}/view`:"")};
 }
@@ -2134,11 +2137,12 @@ function nombreDoc(m,x){ return m==="rcc"?nombreRCC(x):m==="rem"?nombreRem(x):m=
 Object.assign(acciones,{ async guardarSeparados(e){ const m=mod; const l=paraImprimir(m); if(!l.length) return aviso("No hay nada en la lista para guardar.");
   const b=e.target.closest("button"), t=b.textContent; b.disabled=true; const usados=new Set(); const nom=x=>{ let n=nombreDoc(m,x), k=2; while(usados.has(n)) n=nombreDoc(m,x)+` (${k++})`; usados.add(n); return n+".pdf"; };
   try{
-    if(carpeta(m)){ let ok=0; const errs=[];
+    if(carpeta(m)){ let ok=0; const errs=[]; const zipD=new JSZip();
       for(const [i,x] of l.entries()){ b.textContent=`Subiendo ${i+1} de ${l.length}…`;
-        try{ const f=await subirDrive(m, x.fecha||x.emision, nom(x), await pdfDe(m,x)); x.pdf=f.url; x.pdfFecha=hoy(); if(m==="rcc"&&!rccGen(x)) x.rccGen=hoy(); await guardar(m,x._id,true); ok++; }
+        try{ const nm=nom(x), bl=await pdfDe(m,x); zipD.file(nm,bl); const f=await subirDrive(m, x.fecha||x.emision, nm, bl, x.proveedor); x.pdf=f.url; x.pdfFecha=hoy(); if(m==="rcc"&&!rccGen(x)) x.rccGen=hoy(); await guardar(m,x._id,true); ok++; }
         catch(err){ errs.push((x.rcc||x.numero||x.factura||"")+": "+errDrive(err)); if(["needs_reauth","server_not_connected","not_in_manifest","approval_required","declined"].includes(err?.code)) break; } }
-      aviso(errs.length?`Subí ${ok} PDF a Drive. No pude con: ${errs.slice(0,3).join(" · ")}`:`Listo: ${ok} PDF guardados en Drive, cada uno con su nombre.`, errs.length?"err":"ok"); }
+      if(downloads&&Object.keys(zipD.files).length){ b.textContent="Copia en la compu…"; await guardarArchivo(`${{rcc:"RCC",rec:"Recepciones",rem:"Remitos",oc:"OC"}[m]} - ${l.length} PDF.zip`, await zipD.generateAsync({type:"blob"})); }
+      aviso(errs.length?`Subí ${ok} PDF a Drive (y te bajé la copia en .zip). No pude con: ${errs.slice(0,3).join(" · ")}`:`Listo: ${ok} PDF en Drive y la misma copia en un .zip para la compu.`, errs.length?"err":"ok"); }
     else { if(!downloads) return aviso("Esta página no puede descargar archivos. Configurá una carpeta de Drive con “Carpetas Drive”.");
       const zip=new JSZip(); for(const [i,x] of l.entries()){ b.textContent=`Generando ${i+1} de ${l.length}…`; zip.file(nom(x), await pdfDe(m,x)); if(m==="rcc"&&!rccGen(x)){ x.rccGen=hoy(); guardar(m,x._id,true); } }
       b.textContent="Comprimiendo…"; await guardarArchivo(`${{rcc:"RCC",rec:"Recepciones",rem:"Remitos",oc:"OC"}[m]} - ${l.length} PDF.zip`, await zip.generateAsync({type:"blob"})); aviso(`Listo: .zip con ${l.length} PDF separados.`,"ok"); }
