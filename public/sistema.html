@@ -513,9 +513,9 @@ function renderActions(){
   const carpBtn = nombres[mod] ? `<button class="btn" data-act="carpetas" title="Elegir carpetas de Drive">Carpetas Drive</button><button class="btn" data-act="imprimir" title="Imprimir este documento">Imprimir</button>` : "";
   if (mod==="pen") a.innerHTML = `<button class="btn" data-act="armarOC">Reponer pendientes</button><button class="btn" data-act="bajasPend">Bajas pendientes</button><button class="btn primary" data-act="syncKardex">Actualizar desde kardex</button>`;
   if (mod==="rcc") a.innerHTML = `${window.SISTEMA_WEB?"":`<button class="btn" data-act="exportar" title="Copia los RCC a la planilla de la app del equipo (solo los que no estén)">Pasar a la app del equipo</button>`}<button class="btn" data-act="nuevaCx">+ Nueva cirugía</button><button class="btn" data-act="imprimirLista" title="Arma un solo PDF con los RCC que se ven en la lista (según filtro y búsqueda)">Imprimir lista</button>${carpBtn}<button class="btn" data-act="zip">${enDrive?"Completos sin PDF a Drive":"Todos los completos (.zip)"}</button>${pdfBtns}`;
-  if (mod==="rem") a.innerHTML = `<button class="btn" data-act="nuevoRem">+ Remito suelto</button>${carpBtn}${pdfBtns}`;
-  if (mod==="oc") a.innerHTML = `<button class="btn" data-act="nuevaOC">+ OC suelta</button><button class="btn" data-act="armarOC">Reponer pendientes</button>${carpBtn}${pdfBtns}`;
-  if (mod==="rec"){ const nl=recsListas().length; a.innerHTML = `${window.SISTEMA_WEB?"":`<button class="btn" data-act="importarIngresos" title="Trae las recepciones armadas desde las facturas de Drive">Traer ingresos de facturas</button>`}${nl?`<button class="btn" data-act="kardexLote" title="Carga en el kardex las recepciones que tienen todo (lote y hoja)">Cargar ${nl} listas al kardex</button>`:""}${carpBtn}${pdfBtns}`; }
+  if (mod==="rem") a.innerHTML = `<button class="btn" data-act="nuevoRem">+ Remito suelto</button><button class="btn" data-act="imprimirVisibles" title="Arma un solo PDF con todo lo que se ve en la lista (según filtro y búsqueda), listo para imprimir">Imprimir lista</button>${carpBtn}${pdfBtns}`;
+  if (mod==="oc") a.innerHTML = `<button class="btn" data-act="nuevaOC">+ OC suelta</button><button class="btn" data-act="armarOC">Reponer pendientes</button><button class="btn" data-act="imprimirVisibles" title="Arma un solo PDF con todo lo que se ve en la lista (según filtro y búsqueda), listo para imprimir">Imprimir lista</button>${carpBtn}${pdfBtns}`;
+  if (mod==="rec"){ const nl=recsListas().length; a.innerHTML = `${window.SISTEMA_WEB?"":`<button class="btn" data-act="importarIngresos" title="Trae las recepciones armadas desde las facturas de Drive">Traer ingresos de facturas</button>`}${nl?`<button class="btn" data-act="kardexLote" title="Carga en el kardex las recepciones que tienen todo (lote y hoja)">Cargar ${nl} listas al kardex</button>`:""}<button class="btn" data-act="imprimirVisibles" title="Arma un solo PDF con todo lo que se ve en la lista (según filtro y búsqueda), listo para imprimir">Imprimir lista</button>${carpBtn}${pdfBtns}`; }
   if (mod==="hoy"){ const n=sinFirma().length; a.innerHTML=`${window.SISTEMA_WEB?"":`<button class="btn" data-act="exportarWeb" title="Copia todo lo cargado acá a la planilla Surchérie Registros, para usarlo en la app web">Pasar datos a la app web</button>`}<button class="btn" data-act="hoyNuevaCx">+ Nueva cirugía</button>${n?`<button class="btn primary" data-act="hoyFirmar">Firma en lote (${n})</button>`:""}`; return; }
   if (mod==="sgc"){ const r=sgcRec&&DATA.sgc.get(sgcRec); const t=TIPO.get(sel.sgc); const q=r?"del registro":t&&t.plan?(t.plan==="lista"||t.virtual?"del listado":"de la planilla"):"";
     const enD=!!carpeta("sgc"); a.innerHTML=`<button class="btn" data-act="sgcConfig">Configuración</button><button class="btn" data-act="carpetas" title="Elegir carpetas de Drive">Carpetas Drive</button>${q?`<button class="btn" data-act="sgcImprimir">Imprimir</button>${r?(enD?`<button class="btn" data-act="sgcPdf" data-dl="1">Descargar</button><button class="btn primary" data-act="sgcPdf">PDF ${q} a Drive</button>`:`<button class="btn primary" data-act="sgcPdf" data-dl="1">PDF ${q}</button>`):`<button class="btn primary" data-act="sgcPlanilla">PDF ${q}</button>`}`:""}`;
@@ -826,7 +826,7 @@ function renderMain(){
     main.innerHTML=`<div class="bar"><div class="txt">Recepción de la OC <b>${esc(x.oc)}</b> · ${x.kardexOk?`<span class="ok-t">cargada en el kardex</span>`:`<span class="warn-t">${esc(x.kardexMsg||"no se cargó en el kardex")}</span>`}</div>
       <div class="links">${x.ocId&&DATA.oc.has(x.ocId)?`<button class="btn small" data-go="oc:${x.ocId}">Ver OC</button>`:""}${!x.kardexOk&&(x.items||[]).some(i=>i.k&&i.lote&&!i.enKardex)?`<button class="btn small" data-act="kardexRec">Cargar al kardex lo que está listo</button>`:""}</div></div>
       ${x.revisar?`<div class="note warn">${esc(x.revisar)}</div>`:""}${(x.items||[]).some(i=>i.estado&&i.estado!=="Listo"&&!i.enKardex)?`<div class="note">${(x.items||[]).filter(i=>i.estado&&i.estado!=="Listo"&&!i.enKardex).map(i=>`<div>${esc(i.desc)} · lote ${esc(i.lote||"—")}: <b>${esc(i.estado)}</b></div>`).join("")}</div>`:""}
-      <div class="recform">${[["fecha","Fecha recepción"],["descripcion","Descripción/modelo"],["marca","Marca"],["origen","Origen"],["fechaRev","Fecha revisión"]].map(([k,t])=>`<label>${t}<input data-recf="${k}" value="${esc(x[k]||"")}"></label>`).join("")}<button class="btn small" data-act="recConforme">Empaque y rótulo: todo conforme</button></div>
+      <div class="recform">${[["fecha","Fecha recepción"],["descripcion","Descripción/modelo"],["marca","Marca"],["origen","Origen"]].map(([k,t])=>`<label>${t}<input data-recf="${k}" value="${esc(x[k]||"")}"></label>`).join("")}<button class="btn small" data-act="recConforme">Empaque y rótulo: todo conforme</button></div>
       <div class="paperwrap">${paperRec(x)}</div>`;
   }
   if (mod==="rem"){
@@ -1025,7 +1025,7 @@ function paperRec(x){
     <tr class="sp"><td colspan="10"></td></tr>
     <tr><td colspan="2" class="b">VTP/ NP Nº/ ORDEN DE COMPRA:</td><td colspan="8">${esc(x.oc)}</td></tr>
     <tr><td colspan="2" class="b">DESCRIPCIÓN/MODELO:</td><td colspan="8">${esc(x.descripcion||"")}</td></tr>
-    <tr><td class="b">PROVEEDOR:</td><td colspan="2" class="c">${esc(x.proveedor)}</td><td class="b">MARCA:</td><td colspan="3">${esc(x.marca||"")}</td><td class="b c">ORIGEN:</td><td colspan="2">${esc(x.origen||"")}</td></tr>
+    <tr><td class="b">PROVEEDOR:</td><td colspan="2" class="c">${esc(x.proveedor)}</td><td class="b">MARCA:</td><td colspan="3">${esc(x.marca||"")}</td><td class="b c">ORIGEN:</td><td colspan="2">${esc(x.origen||(/novax/i.test(x.proveedor||"")?"Nacional":""))}</td></tr>
     <tr><td colspan="2" class="b">REMITO PROVEEDOR Nº:</td><td colspan="3">${esc(x.remitoProv)}</td><td colspan="2" class="b c">FACTURA PROVEEDOR Nº:</td><td colspan="3">${esc(x.factura)}</td></tr>
     <tr><td colspan="2" class="b">FECHA RECEPCION:</td><td colspan="8">${esc(x.fecha)}</td></tr>
     <tr><td colspan="2" class="b">CANTIDAD TOTAL:</td><td colspan="8">${its.reduce((a,i)=>a+toNum(i.cant),0)}</td></tr>
@@ -1034,7 +1034,7 @@ function paperRec(x){
     <tr class="peach c"><td>EMPAQUE</td><td colspan="2">RÓTULO</td></tr>
     ${its.map(fila).join("")}${`<tr class="rr"><td></td><td></td><td></td><td></td><td></td><td></td><td colspan="2"></td><td colspan="2"></td></tr>`.repeat(vac)}
     <tr class="sp"><td colspan="10"></td></tr>
-    <tr class="ft"><td colspan="4" rowspan="2" class="b w">REVISÓ Y MODIFICÓ: BIOING. MELISA DERIS<br>APROBO: ING. GUSTAVO COBELLI</td><td class="b">FECHA:</td><td class="b">${esc(x.fechaRev||"")}</td><td colspan="2">Nombre del archivo</td><td colspan="2" class="w">${esc(nombreArchRec(x))}</td></tr>
+    <tr class="ft"><td colspan="4" rowspan="2" class="b w">REVISÓ Y MODIFICÓ: BIOING. MELISA DERIS</td><td class="b">FECHA:</td><td class="b">${esc(x.fecha||"")}</td><td colspan="2">Nombre del archivo</td><td colspan="2" class="w">${esc(nombreArchRec(x))}</td></tr>
     <tr class="ft"><td colspan="2" class="b">FIRMA:</td><td colspan="4"></td></tr>
     <tr class="navy"><td colspan="10"></td></tr>
   </table></div>`;
@@ -2062,7 +2062,7 @@ Object.assign(acciones,{
       let act=0;
       for (const x of lista){ const prev=DATA.rec.get(x._id);
         if(prev){ if(prev.kardexOk||(prev.items||[]).some(i=>i.enKardex)) continue;
-          const nv={...prev,items:x.items,revisar:x.revisar,marca:prev.marca||x.marca||"",descripcion:prev.descripcion||x.descripcion||""};
+          const nv={...prev,items:x.items,revisar:x.revisar,marca:prev.marca||x.marca||"",descripcion:prev.descripcion||x.descripcion||"",origen:prev.origen||x.origen||""};
           if(JSON.stringify(nv)===JSON.stringify(prev)) continue;
           DATA.rec.set(x._id,nv); await guardar("rec",x._id,true); act++; continue; }
         DATA.rec.set(x._id,x); ORDER.rec.push(x._id); await guardar("rec",x._id,true); n++; }
@@ -2077,7 +2077,7 @@ Object.assign(acciones,{
 
 document.addEventListener("change",e=>{ const el=e.target.closest&&e.target.closest("[data-recf]"); if(!el||mod!=="rec") return; const x=DATA.rec.get(sel.rec); if(!x) return;
   x[el.dataset.recf]=el.value.trim(); guardar("rec",x._id,true); const pw=document.querySelector(".paperwrap"); if(pw) pw.innerHTML=paperRec(x); });
-Object.assign(acciones,{ recConforme(){ const x=DATA.rec.get(sel.rec); (x.items||[]).forEach(i=>{ i.empaque=i.empaque||"conforme"; i.rotulo=i.rotulo||"conforme"; }); if(!x.fechaRev) x.fechaRev=new Date().toLocaleDateString("es-AR"); guardar("rec",x._id,true); renderMain(); } });
+Object.assign(acciones,{ recConforme(){ const x=DATA.rec.get(sel.rec); (x.items||[]).forEach(i=>{ i.empaque=i.empaque||"conforme"; i.rotulo=i.rotulo||"conforme"; }); guardar("rec",x._id,true); renderMain(); } });
 
 // ---------------- N° de RCC: la fuente es la planilla Seguimiento de cirugías (hasta pasar el 100% a la app) ----------------
 function palabras(p){ return norm(p).replace(/[^a-z ]/g," ").split(" ").filter(w=>w.length>=4); }
@@ -2091,6 +2091,14 @@ async function sincronizarNumeros(rows){
   }
   return camb;
 }
+
+Object.assign(acciones,{ async imprimirVisibles(e){ const ids=[...document.querySelectorAll("#list .item[data-id]")].map(el=>el.dataset.id); const l=ids.map(id=>DATA[mod].get(id)).filter(Boolean);
+  if(!l.length) return aviso("No hay nada en la lista. Usá el buscador o los filtros para elegir qué imprimir.");
+  const b=e.target.closest("button"), t=b.textContent; b.disabled=true;
+  try{ const htmls=[]; for(const [i,x] of l.entries()){ b.textContent=`Preparando ${i+1} de ${l.length}…`; htmls.push(paperDe(mod,x)); }
+    const blob=await pdfHojas(htmls,{imprimir:true}); const nom={rec:"Recepciones",rem:"Remitos",oc:"Ordenes de compra"}[mod]||"Documentos";
+    await imprimirPDF(blob, `Imprimir - ${l.length} ${nom}.pdf`); }
+  catch(err){ aviso("No se pudo preparar la impresión: "+(err.message||err)); } finally{ b.disabled=false; b.textContent=t; } } });
 // ---------------- migración a la app web (planilla Surchérie Registros › AppDB) ----------------
 Object.assign(acciones,{ async exportarWeb(e){
   const b=e.target.closest("button"); const tx=b.textContent; b.disabled=true; b.textContent="Leyendo AppDB…";
