@@ -2046,13 +2046,20 @@ function recsListas(){ return ORDER.rec.map(id=>DATA.rec.get(id)).filter(x=>x&&!
 // agrega n unidades a una hoja del kardex; la factura va en la columna "Factura" de esa hoja; no duplica lote+factura ya cargados
 async function agregarKardex(sid,hoja,n,lote,vto,fecha,rem,fac){
   const dig=s=>String(s||"").replace(/\D/g,"").replace(/^0+/,""); const rango=`'${hoja.replace(/'/g,"''")}'`;
-  const v=await gs("get_values",{spreadsheetId:sid, range:rango+"!A:L"}); const filas=(v&&v.values)||[];
+  // se lee solo A:K (las columnas del formulario); lo que haya a la derecha (Total, casillas, fórmulas) no cuenta
+  const v=await gs("get_values",{spreadsheetId:sid, range:rango+"!A:K"}); const filas=(v&&v.values)||[];
   const hdr=filas.find(r=>r.some(c=>/lote/i.test(String(c)))&&r.some(c=>/fa[c]?tura/i.test(String(c))));
   const fc=hdr?hdr.findIndex(c=>/fa[c]?tura/i.test(String(c))):10;
   const ya=fac?filas.filter(r=>String(r[3]||"").trim().toUpperCase()===String(lote).trim().toUpperCase()&&dig(r[fc]).endsWith(dig(fac).slice(-5))).length:0;
   if (ya>=n) return 0; const m=n-ya;
-  const fila=()=>{ const r=["",fecha,1,lote,vto,rem]; while(r.length<fc) r.push(""); r[fc]=fac||""; return r; };
-  await gs("append_values",{spreadsheetId:sid, range:rango+"!A:L", values:[[m]].concat(Array.from({length:m},fila))}); return m;
+  // texto forzado (') para que Sheets no convierta lote/remito/factura en números o fechas
+  const tx=s=>s?"'"+String(s):"";
+  const fila=()=>{ const r=["",fecha,1,tx(lote),vto,tx(rem)]; while(r.length<fc) r.push(""); r[fc]=tx(fac); return r; };
+  const vals=[[m].concat(Array(fc).fill(""))].concat(Array.from({length:m},fila));
+  // se escribe en filas y columnas explícitas (A..col Factura) justo debajo de la última fila usada: nunca con "append",
+  // que en hojas con columnas extra detecta otra "tabla" y corre todo a la derecha
+  const ini=filas.length+1, fin=ini+m, col=String.fromCharCode(65+fc);
+  await gs("update_values",{spreadsheetId:sid, range:`${rango}!A${ini}:${col}${fin}`, values:vals}); return m;
 }
 async function cargarRecKardex(x){
   const errs=[]; const dig=s=>String(s||"").replace(/\D/g,"").replace(/^0+/,"");
