@@ -511,7 +511,7 @@ function renderActions(){
   if (mod==="rcc") a.innerHTML = `${window.SISTEMA_WEB?"":`<button class="btn" data-act="exportar" title="Copia los RCC a la planilla de la app del equipo (solo los que no estén)">Pasar a la app del equipo</button>`}<button class="btn" data-act="nuevaCx">+ Nueva cirugía</button><button class="btn" data-act="imprimirLista" title="Arma un solo PDF con los RCC que se ven en la lista (según filtro y búsqueda)">Imprimir lista</button>${carpBtn}<button class="btn" data-act="zip">${enDrive?"Completos sin PDF a Drive":"Todos los completos (.zip)"}</button>${pdfBtns}`;
   if (mod==="rem") a.innerHTML = `<button class="btn" data-act="nuevoRem">+ Remito suelto</button>${carpBtn}${pdfBtns}`;
   if (mod==="oc") a.innerHTML = `<button class="btn" data-act="nuevaOC">+ OC suelta</button><button class="btn" data-act="armarOC">Reponer pendientes</button>${carpBtn}${pdfBtns}`;
-  if (mod==="rec") a.innerHTML = `${carpBtn}${pdfBtns}`;
+  if (mod==="rec"){ const nl=recsListas().length; a.innerHTML = `${window.SISTEMA_WEB?"":`<button class="btn" data-act="importarIngresos" title="Trae las recepciones armadas desde las facturas de Drive">Traer ingresos de facturas</button>`}${nl?`<button class="btn" data-act="kardexLote" title="Carga en el kardex las recepciones que tienen todo (lote y hoja)">Cargar ${nl} listas al kardex</button>`:""}${carpBtn}${pdfBtns}`; }
   if (mod==="hoy"){ const n=sinFirma().length; a.innerHTML=`${window.SISTEMA_WEB?"":`<button class="btn" data-act="exportarWeb" title="Copia todo lo cargado acá a la planilla Surchérie Registros, para usarlo en la app web">Pasar datos a la app web</button>`}<button class="btn" data-act="hoyNuevaCx">+ Nueva cirugía</button>${n?`<button class="btn primary" data-act="hoyFirmar">Firma en lote (${n})</button>`:""}`; return; }
   if (mod==="sgc"){ const r=sgcRec&&DATA.sgc.get(sgcRec); const t=TIPO.get(sel.sgc); const q=r?"del registro":t&&t.plan?(t.plan==="lista"||t.virtual?"del listado":"de la planilla"):"";
     const enD=!!carpeta("sgc"); a.innerHTML=`<button class="btn" data-act="sgcConfig">Configuración</button><button class="btn" data-act="carpetas" title="Elegir carpetas de Drive">Carpetas Drive</button>${q?`<button class="btn" data-act="sgcImprimir">Imprimir</button>${r?(enD?`<button class="btn" data-act="sgcPdf" data-dl="1">Descargar</button><button class="btn primary" data-act="sgcPdf">PDF ${q} a Drive</button>`:`<button class="btn primary" data-act="sgcPdf" data-dl="1">PDF ${q}</button>`):`<button class="btn primary" data-act="sgcPlanilla">PDF ${q}</button>`}`:""}`;
@@ -820,7 +820,8 @@ function renderMain(){
   }
   if (mod==="rec"){
     main.innerHTML=`<div class="bar"><div class="txt">Recepción de la OC <b>${esc(x.oc)}</b> · ${x.kardexOk?`<span class="ok-t">cargada en el kardex</span>`:`<span class="warn-t">${esc(x.kardexMsg||"no se cargó en el kardex")}</span>`}</div>
-      <div class="links">${x.ocId&&DATA.oc.has(x.ocId)?`<button class="btn small" data-go="oc:${x.ocId}">Ver OC</button>`:""}</div></div>
+      <div class="links">${x.ocId&&DATA.oc.has(x.ocId)?`<button class="btn small" data-go="oc:${x.ocId}">Ver OC</button>`:""}${!x.kardexOk&&(x.items||[]).some(i=>i.k&&i.lote&&!i.enKardex)?`<button class="btn small" data-act="kardexRec">Cargar al kardex lo que está listo</button>`:""}</div></div>
+      ${x.revisar?`<div class="note warn">${esc(x.revisar)}</div>`:""}${(x.items||[]).some(i=>i.estado&&i.estado!=="Listo"&&!i.enKardex)?`<div class="note">${(x.items||[]).filter(i=>i.estado&&i.estado!=="Listo"&&!i.enKardex).map(i=>`<div>${esc(i.desc)} · lote ${esc(i.lote||"—")}: <b>${esc(i.estado)}</b></div>`).join("")}</div>`:""}
       <div class="paperwrap">${paperRec(x)}</div>`;
   }
   if (mod==="rem"){
@@ -2017,6 +2018,38 @@ function renderSgcResumen(){
 
 Object.assign(acciones,{ hoyNuevaCx(){ mod="rcc"; acciones.nuevaCx(); } });
 
+
+// ---------------- ingresos atrasados: recepciones desde facturas + carga al kardex ----------------
+function recsListas(){ return ORDER.rec.map(id=>DATA.rec.get(id)).filter(x=>x&&!x.kardexOk&&!x.revisar&&(x.items||[]).length&&(x.items||[]).every(i=>i.enKardex||(i.k&&i.lote))); }
+async function cargarRecKardex(x){
+  const errs=[]; const dig=s=>String(s||"").replace(/\D/g,"").replace(/^0+/,"");
+  for (const i of (x.items||[])){ if(i.enKardex||!i.k||!i.lote) continue; const n=toNum(i.cant); if(!n) continue;
+    const rango=`'${i.k.hoja.replace(/'/g,"''")}'`;
+    try{
+      const v=await gs("get_values",{spreadsheetId:i.k.sid, range:rango+"!A:K"}); const filas=(v&&v.values)||[];
+      const ya=filas.filter(r=>String(r[3]||"").trim().toUpperCase()===i.lote.toUpperCase()&&dig(r[10]).endsWith(dig(x.factura).slice(-5))).length;
+      if (ya<n){ const m=n-ya; const rows=[[m,"","","","","","","-"]].concat(Array.from({length:m},()=>["",x.fecha,1,i.lote,i.vto||"S/C",x.remitoProv,"","","",x.factura]));
+        await gs("append_values",{spreadsheetId:i.k.sid, range:rango+"!A:J", values:rows}); }
+      i.enKardex=true;
+    }catch(e){ errs.push(`${i.desc}: ${errTxt(e)}`); }
+  }
+  const falt=(x.items||[]).filter(i=>!i.enKardex);
+  x.kardexOk=!falt.length; x.kardexMsg=x.kardexOk?"":(errs.length?errs.join(" · "):`Faltan ${falt.length} ítems (${[...new Set(falt.map(i=>i.estado||"sin datos"))].join(", ")})`);
+  await guardar("rec",x._id,true); return errs;
+}
+Object.assign(acciones,{
+  async importarIngresos(e){ const b=e.target.closest("button"); const t=b.textContent; b.disabled=true; b.textContent="Trayendo…";
+    try{ const r=await fetch("ingresos.json",{cache:"no-store"}); if(!r.ok) throw new Error("no encontré el archivo de ingresos");
+      const lista=await r.json(); let n=0;
+      for (const x of lista){ if(DATA.rec.has(x._id)) continue; DATA.rec.set(x._id,x); ORDER.rec.push(x._id); await guardar("rec",x._id,true); n++; }
+      render(); aviso(n?`Listo: ${n} recepciones creadas desde las facturas. Revisá las marcadas y cargá las listas al kardex.`:"Ya estaban todas las recepciones.","ok");
+    }catch(err){ aviso("No se pudo traer: "+errTxt(err)); } finally{ b.disabled=false; b.textContent=t; } },
+  async kardexRec(e){ const x=DATA.rec.get(sel.rec); const b=e.target; b.disabled=true; b.textContent="Cargando…";
+    const errs=await cargarRecKardex(x); render(); aviso(errs.length?"Algunos no se cargaron: "+errs.join(" · "):x.kardexOk?"Cargada completa en el kardex.":"Cargado lo que estaba listo. "+x.kardexMsg, errs.length?"err":"ok"); },
+  async kardexLote(e){ const l=recsListas(); const b=e.target.closest("button"); b.disabled=true; let ok=0; const errs=[];
+    for (const [k,x] of l.entries()){ b.textContent=`Cargando ${k+1} de ${l.length}…`; const er=await cargarRecKardex(x); if(er.length) errs.push(`${x.factura}: ${er.join(", ")}`); else ok++; }
+    render(); aviso(`${ok} recepciones cargadas en el kardex.${errs.length?" Con error: "+errs.join(" · "):""}`, errs.length?"err":"ok"); }
+});
 // ---------------- migración a la app web (planilla Surchérie Registros › AppDB) ----------------
 Object.assign(acciones,{ async exportarWeb(e){
   const b=e.target.closest("button"); const tx=b.textContent; b.disabled=true; b.textContent="Leyendo AppDB…";
