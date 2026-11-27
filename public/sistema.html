@@ -1139,8 +1139,9 @@ function nuevaOC(prov, items, rccs, cx){
   DATA.oc.set(id,{...x,_id:id}); ORDER.oc.unshift(id); return id;
 }
 const acciones = {
-  async nuevaCx(){ const max=Math.max(0,...ORDER.rcc.map(id=>DATA.rcc.get(id).orden||0)); const n=max+1, id="r"+n;
-    const r={revisar:"",rcc:`004-${n}`,orden:n,fecha:hoy(),medico:"",paciente:"",institucion:"",cirugia:"",os:"",remitoTransp:"",instru:"",remitoSur:"",productos:[],descartables:{},obs:""};
+  async nuevaCx(){ const id="r"+Date.now();
+    aviso("El N° de RCC se toma de la planilla Seguimiento de cirugías: cargá la cirugía ahí y tocá Actualizar agenda.","ok");
+    const r={revisar:"",rcc:"",orden:0,fecha:hoy(),medico:"",paciente:"",institucion:"",cirugia:"",os:"",remitoTransp:"",instru:"",remitoSur:"",productos:[],descartables:{},obs:""};
     DATA.rcc.set(id,{...r,_id:id}); ORDER.rcc.push(id); sel.rcc=id; render(); await guardar("rcc",id,true); },
   async hacerRem(){ const cx=DATA.rcc.get(sel.rcc); const id=nuevoRemito(cx); await guardar("rem",id,true); await syncRemitoEnCx(DATA.rem.get(id)); mod="rem"; sel.rem=id; render(); aviso(`Remito ${DATA.rem.get(id).numero} creado y anotado en la cirugía.`,"ok"); },
   async nuevoRem(){ const id=nuevoRemito(null); await guardar("rem",id,true); sel.rem=id; render(); },
@@ -1989,7 +1990,8 @@ async function traerAgenda(btn){
     vals.forEach(v=>{ const f=String(v[1]||"").trim(); const d=parseF(f); if(!d||d<desde) return; rows.push({rcc:String(v[0]||"").trim(), fecha:fmt(d), medico:String(v[2]||"").trim(), paciente:String(v[3]||"").trim(), inst:String(v[4]||"").trim(), cir:String(v[5]||"").trim(), remito:String(v[7]||"").trim()}); });
     if(!rows.length) throw new Error("no encontré cirugías con fecha en la pestaña Cirugias");
     const n={rows, leido:hoy()+" "+pad(new Date().getHours())+":"+pad(new Date().getMinutes()), por:sgcYo()};
-    await db.doc("meta/agenda").set(n); AGENDA=n; renderMain();
+    await db.doc("meta/agenda").set(n); AGENDA=n; const camb=await sincronizarNumeros(rows); renderMain();
+    if(camb.length) aviso(`Números de RCC actualizados desde la planilla: ${camb.join(" · ")}`,"ok");
     const fut=rows.filter(r=>parseF(r.fecha)>=hoyD()).length; aviso(`Agenda actualizada: ${rows.length} cirugías leídas, ${fut} programadas desde hoy.`,"ok"); }
   catch(err){ aviso("No pude leer la planilla de seguimiento: "+(err.message||err.code||err)); }
   finally{ if(btn.isConnected){ btn.disabled=false; btn.textContent=tx; } } }
@@ -2076,6 +2078,19 @@ Object.assign(acciones,{
 document.addEventListener("change",e=>{ const el=e.target.closest&&e.target.closest("[data-recf]"); if(!el||mod!=="rec") return; const x=DATA.rec.get(sel.rec); if(!x) return;
   x[el.dataset.recf]=el.value.trim(); guardar("rec",x._id,true); const pw=document.querySelector(".paperwrap"); if(pw) pw.innerHTML=paperRec(x); });
 Object.assign(acciones,{ recConforme(){ const x=DATA.rec.get(sel.rec); (x.items||[]).forEach(i=>{ i.empaque=i.empaque||"conforme"; i.rotulo=i.rotulo||"conforme"; }); if(!x.fechaRev) x.fechaRev=new Date().toLocaleDateString("es-AR"); guardar("rec",x._id,true); renderMain(); } });
+
+// ---------------- N° de RCC: la fuente es la planilla Seguimiento de cirugías (hasta pasar el 100% a la app) ----------------
+function palabras(p){ return norm(p).replace(/[^a-z ]/g," ").split(" ").filter(w=>w.length>=4); }
+async function sincronizarNumeros(rows){
+  const camb=[]; const mismoDia=(a,b)=>{ const x=parseF(a), y=parseF(b); return x&&y&&+x===+y; };
+  for (const id of ORDER.rcc){ const r=DATA.rcc.get(id); if(!r||!r.fecha) continue; const pw=palabras(r.paciente);
+    const cand=rows.filter(a=>mismoDia(a.fecha,r.fecha)&&palabras(a.paciente).some(w=>pw.includes(w)));
+    if(cand.length!==1) continue; const c=cand[0]; const nuevo=String(c.rcc||"").trim();
+    if(nuevo){ if(nuevo!==r.rcc){ camb.push(`${r.paciente}: ${r.rcc||"s/n"} → ${nuevo}`); r.rcc=nuevo; r.orden=+(nuevo.split("-")[1]||0); await guardar("rcc",id,true); } }
+    else if(r.rcc && rows.some(a=>a!==c&&String(a.rcc||"").trim()===r.rcc)){ camb.push(`${r.paciente}: ${r.rcc} → sin número (ese N° es de otra cirugía en la planilla)`); r.rcc=""; r.orden=0; await guardar("rcc",id,true); }
+  }
+  return camb;
+}
 // ---------------- migración a la app web (planilla Surchérie Registros › AppDB) ----------------
 Object.assign(acciones,{ async exportarWeb(e){
   const b=e.target.closest("button"); const tx=b.textContent; b.disabled=true; b.textContent="Leyendo AppDB…";
